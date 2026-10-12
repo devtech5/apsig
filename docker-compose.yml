@@ -1,0 +1,20 @@
+services:
+  code-secours:
+    build: .
+    image: apsig/code-secours:0.2.0
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # URL publique encodée dans les QR codes (domaine HTTPS en production).
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      # 0 = production : numéros d'urgence cliquables, accès rapide démo désactivé.
+      DEMO: ${DEMO:-1}
+      ESCALATION_SECONDS: "60,120"
+      RETENTION_DAYS: "365"
+      MEDIA_RETENTION_DAYS: "90"
+    volumes:
+      - code-secours-data:/data
+
+volumes:
+  code-secours-data:

@@ -1,6 +1,6 @@
 /* global L */
 import {
-  api, esc, icon, fmtTime, fmtTimeSec, fmtDate, fmtDateShort, chrono, toast, storage, speak, logout,
+  api, esc, icon, fmtTime, fmtTimeSec, fmtDate, fmtDateShort, chrono, toast, storage, speak, logout, live,
   TYPE_META, STATUS_META, OPEN_STATUSES, CALLBACK_META, TRUST_META, SOURCE_LABEL,
 } from './common.js';
 
@@ -833,52 +833,54 @@ function setLive(on) {
 }
 
 function connect() {
-  const es = new EventSource('/api/ops/events');
   let lost = false;
-  es.addEventListener('open', () => {
-    setLive(true);
-    if (lost) { lost = false; bootstrap().catch(() => {}); }
+  live('/api/ops/events', {
+    'alert:new': (e) => upsert(JSON.parse(e.data), true),
+    alert: (e) => upsert(JSON.parse(e.data)),
+    stats: (e) => renderKpis(JSON.parse(e.data)),
+    units: (e) => {
+      const sel = state.alerts.get(state.selectedId);
+      const gpsBefore = sel?.unitId && state.units.find((u) => u.id === sel.unitId)?.gps;
+      state.units = JSON.parse(e.data);
+      renderUnits();
+      if (sel?.unitId && state.units.find((u) => u.id === sel.unitId)?.gps !== gpsBefore) renderDetail();
+    },
+    message: (e) => {
+      const m = JSON.parse(e.data);
+      const i = state.messages.findIndex((x) => x.id === m.id);
+      if (i >= 0) state.messages[i] = m; else state.messages.unshift(m);
+      state.messages = state.messages.slice(0, 500);
+      if (state.view === 'messages') renderMessages();
+    },
+    plate: (e) => {
+      const p = JSON.parse(e.data);
+      const i = state.plates.findIndex((x) => x.id === p.id);
+      if (i >= 0) Object.assign(state.plates[i], p); else state.plates.push(p);
+    },
+    payment: (e) => {
+      const p = JSON.parse(e.data);
+      if (p.status === 'réussi') toast(`Paiement reçu : ${p.amount.toLocaleString('fr-FR')} FCFA (${p.operator}) — ${p.code}`, 'success');
+    },
+    device: () => { if (state.view === 'securite') renderSecurity(); },
+    audit: () => { if (state.view === 'securite') renderSecurity(); },
+    config: (e) => {
+      state.config = JSON.parse(e.data);
+      if (!$('#qr-overlay').hidden) renderQrOverlay();
+      if (state.config.tunnelUrl) toast(`Tunnel HTTPS actif : ${state.config.tunnelUrl}`, 'success');
+    },
+    reset: () => { state.selectedId = null; bootstrap().then(() => toast('Démo réinitialisée', 'success')); },
+  }, {
+    onOpen: () => {
+      setLive(true);
+      if (lost) { lost = false; bootstrap().catch(() => {}); }
+    },
+    onError: () => {
+      setLive(false);
+      lost = true;
+      // Session expirée : retour à la connexion.
+      api('/api/auth/me').catch(() => { location.href = '/connexion?next=/centrale'; });
+    },
   });
-  es.addEventListener('error', () => {
-    setLive(false);
-    lost = true;
-    // Session expirée : retour à la connexion.
-    api('/api/auth/me').catch(() => { location.href = '/connexion?next=/centrale'; });
-  });
-  es.addEventListener('alert:new', (e) => upsert(JSON.parse(e.data), true));
-  es.addEventListener('alert', (e) => upsert(JSON.parse(e.data)));
-  es.addEventListener('stats', (e) => renderKpis(JSON.parse(e.data)));
-  es.addEventListener('units', (e) => {
-    const sel = state.alerts.get(state.selectedId);
-    const gpsBefore = sel?.unitId && state.units.find((u) => u.id === sel.unitId)?.gps;
-    state.units = JSON.parse(e.data);
-    renderUnits();
-    if (sel?.unitId && state.units.find((u) => u.id === sel.unitId)?.gps !== gpsBefore) renderDetail();
-  });
-  es.addEventListener('message', (e) => {
-    const m = JSON.parse(e.data);
-    const i = state.messages.findIndex((x) => x.id === m.id);
-    if (i >= 0) state.messages[i] = m; else state.messages.unshift(m);
-    state.messages = state.messages.slice(0, 500);
-    if (state.view === 'messages') renderMessages();
-  });
-  es.addEventListener('plate', (e) => {
-    const p = JSON.parse(e.data);
-    const i = state.plates.findIndex((x) => x.id === p.id);
-    if (i >= 0) Object.assign(state.plates[i], p); else state.plates.push(p);
-  });
-  es.addEventListener('payment', (e) => {
-    const p = JSON.parse(e.data);
-    if (p.status === 'réussi') toast(`Paiement reçu : ${p.amount.toLocaleString('fr-FR')} FCFA (${p.operator}) — ${p.code}`, 'success');
-  });
-  es.addEventListener('device', () => { if (state.view === 'securite') renderSecurity(); });
-  es.addEventListener('audit', () => { if (state.view === 'securite') renderSecurity(); });
-  es.addEventListener('config', (e) => {
-    state.config = JSON.parse(e.data);
-    if (!$('#qr-overlay').hidden) renderQrOverlay();
-    if (state.config.tunnelUrl) toast(`Tunnel HTTPS actif : ${state.config.tunnelUrl}`, 'success');
-  });
-  es.addEventListener('reset', () => { state.selectedId = null; bootstrap().then(() => toast('Démo réinitialisée', 'success')); });
 }
 
 // Horloge et chronomètres.

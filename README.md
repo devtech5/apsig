@@ -1,65 +1,109 @@
-# CODE-SECOURS CI — Prototype APSIG
+# CODE-SECOURS CI — Prototype APSIG v0.2
 
-Prototype de démonstration : **plaque QR → page SOS → centrale de sécurité**, en temps réel.
-Toutes les données (titulaires, numéros, établissements) sont **fictives**. Seules les communes d'Abidjan sont réelles.
+**Plaque QR → page SOS → centrale de sécurité → unités terrain**, en temps réel, avec accès sans Internet (USSD/SMS).
+Toutes les données (titulaires, numéros, établissements, paiements) sont **fictives**. Seules les communes d'Abidjan sont réelles.
 
-## Lancer
+## Démarrage rapide
 
 ```bash
 npm install
-npm start
+npm run demo
 ```
 
-Le terminal affiche les adresses utiles :
+`npm run demo` repart de données propres **et** ouvre un tunnel HTTPS public (Cloudflare) : les téléphones du public fonctionnent depuis **n'importe quel réseau** (4G, Wi-Fi invité qui isole les appareils…), avec géolocalisation et micro. Le terminal affiche l'adresse `https://….trycloudflare.com`, qui est automatiquement encodée dans les QR codes.
 
-| Écran | URL |
+| Commande | Usage |
 |---|---|
-| Accueil (vitrine + QR à scanner) | http://localhost:3000/ |
-| Centrale de sécurité | http://localhost:3000/centrale |
-| Parc de plaques (impression) | http://localhost:3000/plaques |
-| Page SOS de la plaque de démo | http://<IP-du-PC>:3000/demo |
+| `npm run demo` | Démo : données réinitialisées + tunnel HTTPS (nécessite `cloudflared`) |
+| `npm run demo:local` | Démo sur le Wi-Fi local uniquement (téléphones sur le même réseau) |
+| `npm start` | Conserve les données entre deux lancements (base SQLite dans `data/`) |
+| `npm test` | 30 tests automatisés (métier + API) |
+| `npm run backup` | Sauvegarde à chaud de la base |
 
-Les téléphones doivent être sur **le même Wi-Fi** que le PC. Au premier lancement, Windows peut demander d'autoriser Node.js sur le réseau : acceptez pour les **réseaux privés**.
+Installer le tunnel (une seule fois, Windows) : `winget install Cloudflare.cloudflared`.
 
-### Options (variables d'environnement)
+## Les interfaces
+
+| Écran | Adresse | Accès |
+|---|---|---|
+| Accueil (vitrine, QR à scanner) | `/` | public |
+| Page SOS d'une plaque | `/s/<jeton>` — raccourci `/demo` | public |
+| Connexion | `/connexion` | — |
+| Centrale de sécurité | `/centrale` | opérateur, superviseur, admin |
+| Back-office des plaques | `/plaques` | consultation : opérateur · gestion : admin |
+| Application terrain | `/terrain` | agents des unités |
+| Espace client | `/client/<clé privée>` — démo `/client/demo` | lien envoyé par SMS au titulaire |
+| Simulateur USSD / SMS | `/ussd` | public (démo) |
+
+### Comptes de démonstration (fictifs)
+
+En mode démo, la page de connexion propose un **accès rapide** en un clic. Les mots de passe de test :
+
+| Identifiant | Rôle | Mot de passe |
+|---|---|---|
+| `admin` | Administrateur | `Admin#2026` |
+| `superviseur` | Superviseur | `Superviseur#2026` |
+| `operateur`, `operateur2` | Opérateur | `Operateur#2026` |
+| `agent.alpha` … `agent.rouge2` | Agent terrain (une unité chacun) | `Terrain#2026` |
+
+> Un navigateur ne garde qu'une session : pour montrer la centrale **et** l'application terrain en même temps, ouvrez le terrain sur un autre appareil (téléphone) ou une fenêtre de navigation privée.
+
+## Fonctionnalités
+
+**Page SOS (témoin)**
+- Adresse vérifiée, 3 boutons (agression, malaise, incendie), un seul appui.
+- Suivi en direct : prise en charge, unité en route avec ETA, arrivée, clôture ; annulation possible.
+- Français / anglais, **lecture audio** des instructions et des consignes.
+- **Position du témoin** (HTTPS), **photo**, **message vocal** (30 s), message texte.
+- Code USSD de secours affiché ; numéros d'urgence (non composables en mode démo).
+
+**Centrale**
+- Carte temps réel (plaques, unités, trajets, témoin), file d'alertes, **sirène + annonce vocale**.
+- **Escalade automatique** : N1 (superviseur, SMS) à 60 s, N2 (responsable, appel) à 120 s sans prise en charge.
+- **Score de fiabilité** expliqué (position du témoin, appareil, rappel du titulaire, pièces jointes…).
+- **Rappel automatique du titulaire** (appel vocal) et saisie du résultat.
+- Affectation recommandée (unité la plus proche ; équipe armée pour Pass Rouge + agression).
+- Onglets **Historique** (30 jours, filtres, CSV), **Rapports** (carte de chaleur, par commune/jour/heure, impression),
+  **Messages** (tous les SMS/WhatsApp/appels émis), **Sécurité** (appareils suspects, blocage, journal d'audit, sauvegarde).
+- **QR public plein écran** pour faire scanner la salle.
+
+**Application terrain** : mission reçue avec sonnerie et vibration, acceptation, itinéraire Google Maps, **GPS réel** (arrivée détectée à moins de 80 m), clôture sur place.
+
+**Espace client** : alertes à son adresse en direct, notifications du navigateur, gestion des proches à prévenir, **renouvellement Mobile Money** (Orange Money, MTN MoMo, Moov Money, Wave — simulé).
+
+**Back-office** : création de plaque (code `ABJ-COMMUNE-QUARTIER-NNN` + code USSD), modification, **régénération du QR** (l'ancien est révoqué), désactivation, encaissements, historique des paiements, impression.
+
+**Sans Internet** : `*789*CODE#` (USSD) ou SMS « `SOS CODE 1` ». Points d'entrée compatibles avec les passerelles d'agrégateurs (`POST /api/ussd`, `POST /api/sms/inbound`).
+
+## Configuration
 
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `PORT` | Port HTTP | `3000` |
-| `PUBLIC_URL` | URL encodée dans les QR (ex. un tunnel `https://xxx.ngrok.app`) | `http://<IP LAN>:3000` |
-| `DEMO` | `0` pour rendre les numéros d'urgence (170/180/185) cliquables | mode démo actif |
+| `PUBLIC_URL` | URL publique encodée dans les QR (prioritaire sur le tunnel) | tunnel, sinon IP locale |
+| `TUNNEL` | `1` pour ouvrir le tunnel sans `--tunnel` | — |
+| `DEMO` | `0` = production (numéros cliquables, pas d'accès rapide) | démo |
+| `DATA_DIR` / `DB_FILE` | Emplacement des données | `./data` |
+| `ESCALATION_SECONDS` | Seuils d'escalade N1,N2 | `60,120` |
 | `RATE_LIMIT` | Déclenchements max par minute et par IP | `6` |
+| `RETENTION_DAYS` / `MEDIA_RETENTION_DAYS` | Anonymisation des alertes / suppression des médias | `365` / `90` |
+| `NOTIFY_DRIVER` | Pilote de messagerie (`simulation`, `console`) | `simulation` |
 
-## Scénario de démo (≈ 5 min)
+Docker : `docker compose up -d` (voir `docker-compose.yml`).
 
-1. **Accueil** (`/`) : présenter le concept et les deux plaques (Pass Bleu, Pass Rouge Premium).
-2. **Centrale** (`/centrale`) sur le projecteur. *Cliquer une fois n'importe où* pour autoriser le son.
-   Montrer les indicateurs, la carte (184 plaques, 8 unités) et les 2 interventions déjà en cours.
-3. **Scan** : avec un téléphone, scanner le QR de l'accueil (ou de la plaque imprimée), puis appuyer sur **SOS Agression**.
-   → Sirène, bandeau rouge « ALERTE CRITIQUE », alerte localisée sur la carte, 6 acteurs notifiés.
-4. **Prendre en charge**, puis **Affecter une unité** (la plus proche est recommandée).
-   → L'unité se déplace sur la carte ; le téléphone affiche « Équipe en route · arrivée estimée ».
-5. Arrivée automatique « Sur place », puis **Clôturer** avec une issue.
-   → Le téléphone affiche « Intervention terminée ».
-6. **Historique** : traçabilité horodatée, graphique sur 8 jours, export CSV.
+## Charte graphique
 
-Plan B si le Wi-Fi fait défaut : menu **Simuler une alerte** de la centrale, et page SOS ouverte sur le PC (`/demo`).
-**Réinitialiser la démo** (même menu) remet les données à zéro entre deux passages.
+Toutes les couleurs, polices, rayons et ombres sont centralisés dans [`public/css/theme.css`](public/css/theme.css) ; le logo provisoire est [`public/img/logo-apsig.svg`](public/img/logo-apsig.svg). L'application de la charte officielle se fait dans ces deux fichiers.
 
-## Architecture
+## Documentation
 
-- `server.js` : serveur HTTP Node sans framework, API REST, temps réel par Server-Sent Events, QR en SVG.
-- `src/seed.js` : jeu de données fictif déterministe (les QR restent valides d'un démarrage à l'autre).
-- `src/store.js` : logique métier (routage par type d'urgence, affectation, cycle de vie, simulation GPS).
-- `public/` : pages statiques (HTML/CSS/JS natifs) et Leaflet pour la carte.
-- **Charte graphique** : toutes les couleurs, polices et rayons sont dans `public/css/theme.css` ; le logo est `public/img/logo-apsig.svg`.
-
-Cycle d'une alerte : `nouvelle → prise_en_charge → en_route → sur_place → cloturee` (ou `annulee` par le témoin).
+- [Scénario de démonstration](docs/DEMO.md)
+- [Architecture et passage en production](docs/ARCHITECTURE.md)
+- [Conformité et protection des données](docs/CONFORMITE.md)
 
 ## Limites connues du prototype
 
-- Données en mémoire : un redémarrage remet l'état initial.
-- Pas d'authentification sur la centrale.
-- Notifications SMS, WhatsApp et appels **simulés** (horodatés dans le journal).
-- Déplacement des unités simulé et accéléré (~20 à 45 s).
-- Fond de carte en ligne (Esri) : sans Internet, la carte reste fonctionnelle mais sans fond.
+- SMS, WhatsApp, appels, Mobile Money et USSD opérateur sont **simulés** (interfaces prêtes pour de vrais fournisseurs).
+- Les tunnels rapides Cloudflare ne transmettent pas les Server-Sent Events : le navigateur bascule alors automatiquement en long polling (transparent pour l'utilisateur).
+- Langues locales (dioula, baoulé…) à produire avec des traducteurs natifs et des enregistrements audio.
+- Notifications push en arrière-plan (Web Push) : prévues, non incluses.

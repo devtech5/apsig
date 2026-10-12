@@ -38,8 +38,18 @@ export function createApp({ store, auth, notifier, db, config }) {
   const hits = new Map();
   const startedAt = Date.now();
 
-  // --- Temps réel (Server-Sent Events), filtré selon le profil connecté ---------------
-  const send = (res, event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  // --- Temps réel, filtré selon le profil connecté -------------------------------------
+  // Deux transports pour la même diffusion : Server-Sent Events (réseau local) et long polling
+  // (repli automatique quand un proxy met le flux en tampon, comme les tunnels rapides Cloudflare).
+  const send = (res, event, data) => {
+    if (res.virtual) {
+      res.queue.push({ event, data });
+      if (res.queue.length > 500) res.queue.shift();
+      res.wake?.();
+      return;
+    }
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
 
   function broadcast(type, payload) {
     for (const c of clients) {
@@ -92,21 +102,61 @@ export function createApp({ store, auth, notifier, db, config }) {
     }
   }
 
-  const heartbeat = setInterval(() => { for (const c of clients) c.res.write(': ping\n\n'); }, 20000);
+  const heartbeat = setInterval(() => {
+    const now = Date.now();
+    for (const c of clients) {
+      if (!c.res.virtual) c.res.write(': ping\n\n');
+      else if (now - c.lastSeen > 60000) clients.delete(c); // client en long polling disparu
+    }
+  }, 20000);
   heartbeat.unref();
 
   function openStream(req, res, client) {
+    const url = new URL(req.url, 'http://local');
+    if (url.searchParams.get('transport') === 'poll') {
+      const cid = String(url.searchParams.get('cid') ?? '');
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(cid)) throw httpError(400, 'Identifiant de connexion invalide');
+      let entry = [...clients].find((c) => c.res.virtual && c.cid === cid && c.scope === client.scope);
+      const fresh = !entry;
+      if (!entry) {
+        entry = { ...client, cid, res: { virtual: true, queue: [], wake: null } };
+        clients.add(entry);
+      }
+      entry.lastSeen = Date.now();
+      entry.fresh = fresh;
+      if (fresh) send(entry.res, 'hello', { at: Date.now(), transport: 'poll' });
+      // Réponse après l'envoi des évènements initiaux par la route, ou au plus tard après 20 s.
+      setImmediate(() => flushPoll(entry, req, res));
+      return entry;
+    }
     res.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
     res.write('retry: 2000\n\n');
-    const entry = { res, ...client };
+    const entry = { res, ...client, fresh: true };
     clients.add(entry);
-    req.on('close', () => clients.delete(entry));
+    res.on('close', () => clients.delete(entry));
+    send(res, 'hello', { at: Date.now(), transport: 'sse' });
     return entry;
+  }
+
+  function flushPoll(entry, req, res) {
+    let done = false;
+    let timer = null;
+    const respond = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      entry.res.wake = null;
+      json(res, 200, { events: entry.res.queue.splice(0) });
+    };
+    if (entry.res.queue.length) return respond();
+    timer = setTimeout(respond, 20000);
+    entry.res.wake = () => setTimeout(respond, 60); // regroupe les évènements rapprochés
+    res.on('close', () => { if (!done) { done = true; clearTimeout(timer); entry.res.wake = null; } });
   }
 
   // --- Utilitaires HTTP ------------------------------------------------------------
@@ -262,7 +312,7 @@ export function createApp({ store, auth, notifier, db, config }) {
     const a = store.alertById(url.searchParams.get('alert'));
     if (!a || a.reporterKey !== url.searchParams.get('key')) throw httpError(404, 'Alerte introuvable');
     const c = openStream(req, res, { scope: 'reporter', alertId: a.id });
-    send(c.res, 'alert', store.publicAlert(a));
+    if (c.fresh) send(c.res, 'alert', store.publicAlert(a));
     return null;
   });
 
@@ -320,8 +370,7 @@ export function createApp({ store, auth, notifier, db, config }) {
     };
   });
   route('GET', '/api/ops/events', OPS, ({ req, res, user }) => {
-    const c = openStream(req, res, { scope: 'ops', rank: auth.publicUser(user).rank });
-    send(c.res, 'hello', { at: Date.now() });
+    openStream(req, res, { scope: 'ops', rank: auth.publicUser(user).rank });
     return null;
   });
   route('GET', '/api/ops/alert/:id', OPS, ({ params }) => {
@@ -439,7 +488,7 @@ export function createApp({ store, auth, notifier, db, config }) {
   route('GET', '/api/terrain/events', AGENT, ({ req, res, user }) => {
     const unit = myUnit(user);
     const c = openStream(req, res, { scope: 'agent', unitId: unit.id, missionId: unit.alertId });
-    send(c.res, 'mission', missionOf(unit));
+    if (c.fresh) send(c.res, 'mission', missionOf(unit));
     return null;
   });
 

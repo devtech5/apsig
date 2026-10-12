@@ -1,4 +1,4 @@
-import { api, esc, icon, plateHTML, fmtDate, fmtMoney, toast, logout } from './common.js';
+import { api, esc, icon, plateHTML, fmtDate, fmtMoney, toast, logout, live } from './common.js';
 
 document.querySelectorAll('[data-icon]').forEach((el) => { el.outerHTML = icon(el.dataset.icon); });
 
@@ -230,13 +230,14 @@ try {
   $('commune').innerHTML += communes.map((c) => `<option>${esc(c)}</option>`).join('');
   render();
 
-  const es = new EventSource('/api/ops/events');
-  es.addEventListener('plate', (e) => upsert(JSON.parse(e.data)));
-  es.addEventListener('payment', (e) => {
-    const p = JSON.parse(e.data);
-    if (p.status === 'réussi') toast(`Paiement reçu : ${fmtMoney(p.amount)} (${p.operator}) — ${p.code}`, 'success');
-    if (p.status === 'échec') toast(`Paiement échoué (${p.code}) : ${p.reason}`, 'error');
-    if (!$('view-payments').hidden) renderPayments();
+  live('/api/ops/events', {
+    plate: (e) => upsert(JSON.parse(e.data)),
+    payment: (e) => {
+      const p = JSON.parse(e.data);
+      if (p.status === 'réussi') toast(`Paiement reçu : ${fmtMoney(p.amount)} (${p.operator}) — ${p.code}`, 'success');
+      if (p.status === 'échec') toast(`Paiement échoué (${p.code}) : ${p.reason}`, 'error');
+      if (!$('view-payments').hidden) renderPayments();
+    },
   });
 } catch {
   location.href = '/connexion?next=/plaques';

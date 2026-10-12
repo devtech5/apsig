@@ -1,4 +1,4 @@
-import { api, esc, icon, plateHTML, fmtDate, fmtTime, fmtMoney, toast, TYPE_META, STATUS_META } from './common.js';
+import { api, esc, icon, plateHTML, fmtDate, fmtTime, fmtMoney, toast, live, TYPE_META, STATUS_META } from './common.js';
 
 const key = location.pathname.split('/').pop();
 const app = document.getElementById('app');
@@ -131,21 +131,22 @@ function notify(title, body) {
 }
 
 function connect() {
-  const es = new EventSource(`/api/client/${key}/events`);
-  es.addEventListener('alert:new', (e) => {
-    const a = JSON.parse(e.data);
-    notify('Alerte à votre adresse', `${a.typeLabel} — la centrale APSIG est mobilisée.`);
-    refresh();
-  });
-  es.addEventListener('alert', () => refresh());
-  es.addEventListener('refresh', () => refresh());
-  es.addEventListener('payment', (e) => {
-    const p = JSON.parse(e.data);
-    if (pendingPayment && p.id === pendingPayment.id && p.status !== 'en_attente') {
-      pendingPayment = null;
-      if (p.status === 'réussi') { toast(`Paiement reçu : ${fmtMoney(p.amount)}`, 'success'); notify('Paiement reçu', `${fmtMoney(p.amount)} via ${p.operator}`); } else toast(`Paiement échoué : ${p.reason ?? ''}`, 'error');
+  live(`/api/client/${key}/events`, {
+    'alert:new': (e) => {
+      const a = JSON.parse(e.data);
+      notify('Alerte à votre adresse', `${a.typeLabel} — la centrale APSIG est mobilisée.`);
       refresh();
-    }
+    },
+    alert: () => refresh(),
+    refresh: () => refresh(),
+    payment: (e) => {
+      const p = JSON.parse(e.data);
+      if (pendingPayment && p.id === pendingPayment.id && p.status !== 'en_attente') {
+        pendingPayment = null;
+        if (p.status === 'réussi') { toast(`Paiement reçu : ${fmtMoney(p.amount)}`, 'success'); notify('Paiement reçu', `${fmtMoney(p.amount)} via ${p.operator}`); } else toast(`Paiement échoué : ${p.reason ?? ''}`, 'error');
+        refresh();
+      }
+    },
   });
 }
 

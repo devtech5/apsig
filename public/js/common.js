@@ -124,6 +124,59 @@ export function speak(text, lang = 'fr-FR') {
   }
 }
 
+// Connexion temps réel : Server-Sent Events, avec repli automatique en long polling
+// si aucune donnée n'arrive en 5 s (proxy ou tunnel qui met le flux en tampon).
+// `handlers` reçoit des objets { data } comme avec EventSource.
+export function live(url, handlers, { onOpen, onError } = {}) {
+  let closed = false;
+  let received = false;
+  let es = null;
+  const cid = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
+  const fire = (event, data) => {
+    received = true;
+    handlers[event]?.({ data });
+  };
+
+  async function poll() {
+    const sep = url.includes('?') ? '&' : '?';
+    let failures = 0;
+    let announced = false;
+    while (!closed) {
+      try {
+        const res = await fetch(`${url}${sep}transport=poll&cid=${cid}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(String(res.status));
+        const { events } = await res.json();
+        if (!announced || failures) onOpen?.();
+        announced = true;
+        failures = 0;
+        for (const e of events) if (!closed) fire(e.event, JSON.stringify(e.data));
+      } catch {
+        failures += 1;
+        onError?.();
+        await new Promise((r) => setTimeout(r, Math.min(5000, 800 * failures)));
+      }
+    }
+  }
+
+  es = new EventSource(url);
+  es.addEventListener('open', () => onOpen?.());
+  es.addEventListener('error', () => { if (!closed) onError?.(); });
+  es.addEventListener('hello', () => { received = true; });
+  for (const name of Object.keys(handlers)) es.addEventListener(name, (e) => fire(name, e.data));
+  setTimeout(() => {
+    if (!received && !closed) {
+      es.close();
+      es = null;
+      poll();
+    }
+  }, 5000);
+
+  return {
+    close() { closed = true; es?.close(); },
+    get transport() { return es ? 'sse' : 'poll'; },
+  };
+}
+
 // Identifiant pseudonyme de l'appareil du témoin (lutte contre les abus, aucune donnée personnelle).
 export function deviceId() {
   const store = storage('local');

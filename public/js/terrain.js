@@ -1,4 +1,4 @@
-import { api, esc, icon, fmtTime, toast, logout, TYPE_META, STATUS_META } from './common.js';
+import { api, esc, icon, fmtTime, toast, logout, live, TYPE_META, STATUS_META } from './common.js';
 
 document.querySelectorAll('[data-icon]').forEach((el) => { el.outerHTML = icon(el.dataset.icon); });
 const $ = (id) => document.getElementById(id);
@@ -138,22 +138,24 @@ $('gps-btn').addEventListener('click', () => (watchId === null ? startGps() : st
 $('t-logout').addEventListener('click', logout);
 
 function connect() {
-  const es = new EventSource('/api/terrain/events');
-  es.addEventListener('open', () => { $('t-live').classList.remove('is-off'); $('t-live').textContent = 'En ligne'; });
-  es.addEventListener('error', () => {
-    $('t-live').classList.add('is-off');
-    $('t-live').textContent = 'Reconnexion…';
-    api('/api/auth/me').catch(() => { location.href = '/connexion?next=/terrain'; });
+  live('/api/terrain/events', {
+    mission: (e) => {
+      const next = JSON.parse(e.data);
+      const isNew = next && (!mission || mission.id !== next.id);
+      mission = next;
+      if (isNew) { ring(); toast(`Nouvelle mission : ${TYPE_META[next.type].label} — ${next.code}`, 'error'); }
+      api('/api/terrain/me').then((res) => { unit = res.unit; mission = res.mission; renderHeader(); renderMission(isNew); }).catch(() => renderMission(isNew));
+    },
+    unit: (e) => { unit = JSON.parse(e.data); renderHeader(); if (mission?.status === 'en_route') renderMission(); },
+    reset: () => location.reload(),
+  }, {
+    onOpen: () => { $('t-live').classList.remove('is-off'); $('t-live').textContent = 'En ligne'; },
+    onError: () => {
+      $('t-live').classList.add('is-off');
+      $('t-live').textContent = 'Reconnexion…';
+      api('/api/auth/me').catch(() => { location.href = '/connexion?next=/terrain'; });
+    },
   });
-  es.addEventListener('mission', (e) => {
-    const next = JSON.parse(e.data);
-    const isNew = next && (!mission || mission.id !== next.id);
-    mission = next;
-    if (isNew) { ring(); toast(`Nouvelle mission : ${TYPE_META[next.type].label} — ${next.code}`, 'error'); }
-    api('/api/terrain/me').then((res) => { unit = res.unit; renderHeader(); renderMission(isNew); }).catch(() => renderMission(isNew));
-  });
-  es.addEventListener('unit', (e) => { unit = JSON.parse(e.data); renderHeader(); if (mission?.status === 'en_route') renderMission(); });
-  es.addEventListener('reset', () => location.reload());
 }
 
 try {

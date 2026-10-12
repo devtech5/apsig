@@ -97,6 +97,23 @@ describe('Public', () => {
   });
 });
 
+describe('Temps réel en long polling (repli derrière un proxy)', () => {
+  test('évènements initiaux puis attente jusqu\'au changement suivant', async () => {
+    const r = await call('POST', '/api/public/alerts', { body: { token: store.plates[60].token, type: 'medical' }, headers: { 'X-Forwarded-For': '10.0.0.77' } });
+    const { alert, key } = r.data;
+    const url = `/api/public/events?alert=${alert.id}&key=${key}&transport=poll&cid=testcid0001`;
+    const first = await call('GET', url);
+    assert.deepEqual(first.data.events.map((e) => e.event), ['hello', 'alert']);
+    const pending = call('GET', url);
+    await new Promise((res) => setTimeout(res, 100));
+    await call('POST', `/api/public/alerts/${alert.id}/cancel`, { body: { key } });
+    const second = await pending;
+    const last = second.data.events.at(-1);
+    assert.equal(last.event, 'alert');
+    assert.equal(last.data.status, 'annulee');
+  });
+});
+
 describe('USSD & SMS', () => {
   test('session USSD complète', async () => {
     const form = async (text) => {

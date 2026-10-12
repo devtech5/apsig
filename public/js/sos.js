@@ -1,4 +1,4 @@
-import { api, esc, icon, fmtTime, fmtTimeSec, toast, storage, speak, deviceId, TYPE_META } from './common.js';
+import { api, esc, icon, fmtTime, fmtTimeSec, toast, storage, speak, deviceId, live, TYPE_META } from './common.js';
 
 const app = document.getElementById('app');
 const token = location.pathname.split('/').pop();
@@ -306,13 +306,15 @@ function restart() {
 
 function listen() {
   stream?.close();
-  stream = new EventSource(`/api/public/events?alert=${encodeURIComponent(current.alert.id)}&key=${encodeURIComponent(current.key)}`);
-  stream.addEventListener('alert', (e) => {
-    const prev = current?.alert.status;
-    current.alert = JSON.parse(e.data);
-    if (prev && prev !== current.alert.status && navigator.vibrate) navigator.vibrate([40, 60, 40]);
-    renderTracking();
-    if (['cloturee', 'annulee'].includes(current.alert.status)) stream.close();
+  stream = live(`/api/public/events?alert=${encodeURIComponent(current.alert.id)}&key=${encodeURIComponent(current.key)}`, {
+    alert: (e) => {
+      if (!current) return;
+      const prev = current.alert.status;
+      current.alert = JSON.parse(e.data);
+      if (prev !== current.alert.status && navigator.vibrate) navigator.vibrate([40, 60, 40]);
+      renderTracking();
+      if (['cloturee', 'annulee'].includes(current.alert.status)) stream?.close();
+    },
   });
 }
 
