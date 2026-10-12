@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Centrale de sécurité — APSIG</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/centrale.css">
+</head>
+<body class="theme-dark ops">
+  <header class="ops-top">
+    <a class="brand" href="/" title="Accueil">
+      <img src="/img/logo-apsig.svg" alt="">
+      <div><strong>APSIG</strong><span>Centrale de sécurité</span></div>
+    </a>
+    <nav class="ops-tabs" aria-label="Vues">
+      <button type="button" data-view="supervision" aria-pressed="true"><span data-icon="map"></span>Supervision</button>
+      <button type="button" data-view="historique" aria-pressed="false"><span data-icon="history"></span>Historique</button>
+      <a href="/plaques" target="_blank" rel="noopener"><span data-icon="qr"></span>Plaques</a>
+    </nav>
+    <div class="ops-top__right">
+      <span id="live" class="live is-off">Connexion…</span>
+      <span id="clock" class="clock mono">--:--:--</span>
+      <button type="button" id="sound" class="btn btn--sm btn--ghost" aria-pressed="true" title="Alerte sonore"></button>
+      <div class="sim">
+        <button type="button" id="sim-btn" class="btn btn--sm btn--danger" aria-haspopup="true" aria-expanded="false"><span data-icon="play"></span>Simuler une alerte<span data-icon="chevronDown"></span></button>
+        <div class="menu" id="sim-menu" hidden>
+          <button type="button" data-sim="agression"><i class="dot dot--agression"></i>Agression / Intrusion</button>
+          <button type="button" data-sim="medical"><i class="dot dot--medical"></i>Maladie / Accident</button>
+          <button type="button" data-sim="incendie"><i class="dot dot--incendie"></i>Incendie</button>
+          <button type="button" data-sim="random"><i class="dot"></i>Type aléatoire</button>
+          <hr>
+          <button type="button" data-sim="reset"><span data-icon="refresh"></span>Réinitialiser la démo</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div id="critical" class="critical" hidden role="alert"></div>
+
+  <section id="kpis" class="kpis" aria-label="Indicateurs"></section>
+
+  <main id="view-supervision" class="ops-main">
+    <aside class="queue" aria-label="File des alertes">
+      <div class="queue__head">
+        <h2>Alertes</h2>
+        <div class="seg" role="group" aria-label="Filtre">
+          <button type="button" data-filter="open" aria-pressed="true">En cours <b id="count-open">0</b></button>
+          <button type="button" data-filter="today" aria-pressed="false">Aujourd'hui <b id="count-today">0</b></button>
+        </div>
+      </div>
+      <ul id="queue" class="queue__list"></ul>
+    </aside>
+    <section class="map-wrap" aria-label="Carte">
+      <div id="map"></div>
+      <div class="map-legend">
+        <span><i class="dot dot--bleu"></i>Pass Bleu</span>
+        <span><i class="dot dot--rouge"></i>Pass Rouge</span>
+        <span><i class="sq"></i>Unité APSIG</span>
+        <span><i class="dot dot--agression pulse"></i>Alerte active</span>
+      </div>
+    </section>
+    <aside id="detail" class="detail" aria-label="Détail de l'alerte"></aside>
+  </main>
+
+  <main id="view-historique" class="ops-history" hidden>
+    <div class="h-head">
+      <div>
+        <h2>Historique &amp; traçabilité</h2>
+        <p class="muted">Chaque alerte est horodatée de bout en bout : déclenchement, prise en charge, arrivée, clôture.</p>
+      </div>
+      <a class="btn" href="/api/ops/alerts.csv"><span data-icon="download"></span>Exporter (CSV)</a>
+    </div>
+    <div class="h-chart" id="h-chart" aria-label="Alertes des 8 derniers jours"></div>
+    <div class="toolbar">
+      <label class="field field--search"><span data-icon="search"></span><input id="h-q" type="search" placeholder="Code plaque, ID, quartier, issue…"></label>
+      <select id="h-type" class="field" aria-label="Type">
+        <option value="">Tous types</option><option value="agression">Agression</option><option value="medical">Médical</option><option value="incendie">Incendie</option>
+      </select>
+      <select id="h-status" class="field" aria-label="Statut">
+        <option value="">Tous statuts</option><option value="open">En cours</option><option value="cloturee">Clôturées</option><option value="annulee">Annulées</option>
+      </select>
+      <select id="h-commune" class="field" aria-label="Commune"><option value="">Toutes communes</option></select>
+      <select id="h-period" class="field" aria-label="Période">
+        <option value="today">Aujourd'hui</option><option value="7" selected>7 derniers jours</option><option value="all">Tout</option>
+      </select>
+    </div>
+    <div class="h-summary" id="h-summary"></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>ID</th><th>Déclenchée</th><th>Plaque</th><th>Localisation</th><th>Type</th><th>Unité</th><th>Prise en charge</th><th>Arrivée</th><th>Statut</th><th>Issue</th></tr></thead>
+        <tbody id="h-rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <dialog id="modal" class="modal"></dialog>
+
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="/js/centrale.js"></script>
+</body>
+</html>

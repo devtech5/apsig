@@ -1,0 +1,19 @@
+{
+  "name": "code-secours-ci",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prototype CODE-SECOURS CI (APSIG) — plaque QR, page SOS, centrale de sécurité. Données fictives.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "qrcode": "^1.5.4"
+  }
+}

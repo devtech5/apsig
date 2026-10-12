@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b2a63">
+  <title>Code-Secours CI — APSIG</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="/"><img src="/img/logo-apsig.svg" alt=""><div><strong>APSIG</strong><span>Sécurité pour tous, en toute confiance</span></div></a>
+      <nav class="site-nav" aria-label="Navigation principale">
+        <a href="/" aria-current="page">Accueil</a>
+        <a href="/demo" target="_blank" rel="noopener">Page SOS</a>
+        <a href="/centrale">Centrale</a>
+        <a href="/plaques">Plaques</a>
+      </nav>
+    </div>
+  </header>
+  <div class="demo-ribbon">Prototype de démonstration — toutes les données (noms, numéros, adresses précises) sont fictives.</div>
+
+  <main>
+    <section class="hero">
+      <div class="container hero__grid">
+        <div>
+          <div class="eyebrow">Code-Secours CI</div>
+          <h1>De la plaque intelligente à la <em>coordination</em> des secours.</h1>
+          <p class="lead">Une adresse unique, un QR code, une alerte en un geste. La centrale APSIG localise, route et suit chaque urgence en temps réel.</p>
+          <div class="hero__actions">
+            <a class="btn btn--danger btn--lg" href="/demo" target="_blank" rel="noopener"><span data-icon="smartphone"></span>Ouvrir la page SOS</a>
+            <a class="btn btn--lg" href="/centrale"><span data-icon="monitor"></span>Centrale de sécurité</a>
+            <a class="btn btn--ghost btn--lg" href="/plaques"><span data-icon="qr"></span>Plaques</a>
+          </div>
+        </div>
+        <div class="hero__plates" id="hero-plates"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="scan-card">
+          <img class="scan-card__qr" id="demo-qr" alt="QR code de la plaque de démonstration">
+          <div>
+            <div class="eyebrow muted">Essayez maintenant</div>
+            <h3>Scannez la plaque de démonstration</h3>
+            <ol>
+              <li>Connectez votre téléphone au même réseau Wi-Fi que cet ordinateur.</li>
+              <li>Scannez le QR code avec l'appareil photo : aucune application à installer.</li>
+              <li>Choisissez le type d'urgence : l'alerte apparaît aussitôt sur la centrale.</li>
+            </ol>
+            <span class="url-chip" id="demo-url">…</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <h2>Les trois interfaces du prototype</h2>
+        <p class="muted">Chaque acteur dispose de son écran, synchronisé en temps réel.</p>
+        <div class="entry-grid">
+          <a class="entry entry--sos" href="/demo" target="_blank" rel="noopener">
+            <span class="entry__icon"><span data-icon="smartphone"></span></span>
+            <h3>Page SOS publique</h3>
+            <p>Ce que voit le témoin après le scan : adresse vérifiée, 3 boutons d'urgence, suivi de l'intervention en direct.</p>
+            <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
+          </a>
+          <a class="entry" href="/centrale">
+            <span class="entry__icon"><span data-icon="monitor"></span></span>
+            <h3>Centrale de sécurité</h3>
+            <p>Carte en temps réel, file d'alertes, affectation des unités, appels, notifications et historique horodaté.</p>
+            <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
+          </a>
+          <a class="entry" href="/plaques">
+            <span class="entry__icon"><span data-icon="qr"></span></span>
+            <h3>Parc de plaques</h3>
+            <p>184 plaques Pass Bleu et Pass Rouge Premium, avec QR code sécurisé, titulaire et contacts à prévenir.</p>
+            <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <h2>Comment ça marche</h2>
+        <p class="muted">De la plaque à l'intervention, en six étapes.</p>
+        <div class="steps">
+          <div class="step"><h4>Plaque physique</h4><p>Adresse Code-Secours unique, QR sécurisé, position GPS vérifiée.</p></div>
+          <div class="step"><h4>Scan</h4><p>Un geste simple depuis n'importe quel téléphone, sans application.</p></div>
+          <div class="step"><h4>Page SOS</h4><p>Agression, malaise ou incendie : un seul appui.</p></div>
+          <div class="step"><h4>Plateforme APSIG</h4><p>Identification, horodatage, règles de routage, traçabilité.</p></div>
+          <div class="step"><h4>Centrale</h4><p>Vision globale : appeler, affecter, suivre l'intervention.</p></div>
+          <div class="step"><h4>Acteurs notifiés</h4><p>Société partenaire, secours publics, chef de quartier, famille.</p></div>
+        </div>
+        <div class="keypoints">
+          <span><span data-icon="check"></span>Sans application mobile</span>
+          <span><span data-icon="check"></span>Localisation immédiate</span>
+          <span><span data-icon="check"></span>Simple pour tous</span>
+          <span><span data-icon="check"></span>Suivi en temps réel</span>
+          <span><span data-icon="check"></span>Pass Bleu &amp; Pass Rouge</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">APSIG · Code-Secours CI · Prototype v0.1 — Ensemble pour des communautés plus sûres</footer>
+
+  <script type="module">
+    import { api, icon, plateHTML } from '/js/common.js';
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.outerHTML = icon(el.dataset.icon); });
+    const cfg = await api('/api/config');
+    const url = `${cfg.baseUrl}/s/${cfg.demoToken}`;
+    document.getElementById('demo-qr').src = `/qr/${cfg.demoToken}.svg`;
+    document.getElementById('demo-url').textContent = url;
+    const { alerts, plates, ...rest } = await api('/api/ops/bootstrap');
+    const showcase = plates.filter((p) => p.showcase);
+    const blue = showcase.find((p) => p.code === 'ABJ-YOP-NIANGON-453');
+    const red = showcase.find((p) => p.pass === 'rouge');
+    document.getElementById('hero-plates').innerHTML = plateHTML(blue) + plateHTML(red);
+  </script>
+</body>
+</html>
