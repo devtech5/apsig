@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/*
+ * CHARTE GRAPHIQUE — fichier unique à adapter.
+ * Toutes les couleurs, typographies, rayons et ombres viennent d'ici (jetons Tailwind).
+ * Pour appliquer la charte officielle APSIG : remplacer les valeurs ci-dessous (et /img/logo-apsig.svg).
+ */
+
+/* Le mode sombre est porté par la classe .theme-dark (centrale, application terrain). */
+@custom-variant dark (&:where(.theme-dark, .theme-dark *));
+
+:root {
+  /* Surfaces & texte (thème clair) */
+  --bg: #f3f6fb;
+  --surface: #ffffff;
+  --surface-2: #f5f8fc;
+  --surface-3: #eaeef6;
+  --line: #dbe2ee;
+  --ink: #0e1a2f;
+  --muted: #5a6a82;
+  --agression-bg: #fdecee;
+  --medical-bg: #fff3e5;
+  --incendie-bg: #e9f1fd;
+  --success-bg: #e6f6ed;
+  --warning-bg: #fff6dc;
+  --warning-ink: #8a6100;
+  --shadow-card: 0 1px 2px rgb(14 26 47 / .05), 0 4px 16px rgb(14 26 47 / .06);
+}
+
+.theme-dark {
+  --bg: #060f20;
+  --surface: #0c1a35;
+  --surface-2: #112345;
+  --surface-3: #182f58;
+  --line: #1f3765;
+  --ink: #e8eef8;
+  --muted: #93a6c6;
+  --agression-bg: rgb(215 25 47 / .18);
+  --medical-bg: rgb(238 122 0 / .18);
+  --incendie-bg: rgb(29 99 214 / .22);
+  --success-bg: rgb(28 154 85 / .2);
+  --warning-bg: rgb(217 154 0 / .2);
+  --warning-ink: #f5c84b;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / .35);
+  color-scheme: dark;
+}
+
+@theme {
+  /* Marque */
+  --color-brand: #0b2a63;
+  --color-brand-700: #071d47;
+  --color-brand-500: #1a4596;
+  --color-brand-50: #eaf0fb;
+  --color-accent: #c8102e;
+
+  /* Types d'urgence */
+  --color-agression: #d7192f;
+  --color-medical: #ee7a00;
+  --color-incendie: #1d63d6;
+  --color-danger: #d7192f;
+  --color-danger-700: #a8101f;
+
+  /* Pass */
+  --color-pass-bleu: #1446a0;
+  --color-pass-bleu-dark: #0b2a63;
+  --color-pass-rouge: #b3122b;
+  --color-pass-rouge-dark: #7d0b1d;
+
+  /* États */
+  --color-success: #1c9a55;
+  --color-warning: #d99a00;
+  --color-info: #2b7be4;
+  --color-focus: #2b7be4;
+
+  /* Typographie */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  /* Ombres */
+  --shadow-plate: 0 2px 0 rgb(255 255 255 / .25) inset, 0 14px 32px rgb(7 29 71 / .3);
+
+  --spacing-13: 3.25rem;
+}
+
+/* Jetons qui basculent avec le thème sombre. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-agression-bg: var(--agression-bg);
+  --color-medical-bg: var(--medical-bg);
+  --color-incendie-bg: var(--incendie-bg);
+  --color-success-bg: var(--success-bg);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-ink: var(--warning-ink);
+  --shadow-card: var(--shadow-card);
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  :focus-visible { outline-color: var(--color-focus); }
+  .mono, code { font-family: var(--font-mono); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+}
+
+/* --- Animations ------------------------------------------------------------------ */
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+.toast-in { animation: toast-in .2s ease-out; }
+@keyframes ring-out { from { transform: scale(.6); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }
+@keyframes flash { 50% { filter: brightness(1.2); } }
+.animate-flash { animation: flash 1.2s ease-in-out infinite; }
+@keyframes q-new { 50% { background: color-mix(in srgb, var(--c) 22%, transparent); } }
+.animate-q-new { animation: q-new 1.4s ease-in-out infinite; }
+@keyframes bump { 30% { transform: scale(1.2); } }
+.animate-bump { animation: bump .5s ease-out; }
+@keyframes sos-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); } 70% { box-shadow: 0 0 0 22px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.animate-sos-pulse { animation: sos-pulse 1.8s ease-out infinite; }
+
+/* --- Icônes en chaîne (marqueurs Leaflet, infobulles) -------------------------------- */
+.cs-icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* --- Carte (Leaflet) ------------------------------------------------------------------ */
+.leaflet-container { font: inherit; background: #0a1730; }
+.tiles-dark { filter: invert(1) hue-rotate(200deg) brightness(.85) contrast(.9) saturate(.5); }
+.leaflet-div-icon.unit-icon, .leaflet-div-icon.alert-icon { background: transparent; border: 0; }
+.unit-marker { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 4px; border-radius: 6px; white-space: nowrap; font-size: 11px; font-weight: 800; color: #fff; background: #11804a; border: 1.5px solid #fff; box-shadow: 0 2px 6px rgb(0 0 0 / .5); transform: translate(-50%, -50%); }
+.unit-marker .cs-icon { width: 14px; height: 14px; }
+.unit-marker--busy { background: #c98500; }
+.unit-marker--moving { background: var(--color-info); }
+.unit-marker--gps { background: #7b2ff7; }
+.unit-marker--intervention { outline: 2px solid var(--color-accent); }
+.alert-marker { --c: var(--color-agression); position: relative; width: 34px; height: 34px; transform: translate(-50%, -50%); }
+.alert-marker--medical { --c: var(--color-medical); }
+.alert-marker--incendie { --c: var(--color-incendie); }
+.alert-marker__core { position: absolute; inset: 5px; border-radius: 50%; background: var(--c); border: 2px solid #fff; display: grid; place-items: center; color: #fff; box-shadow: 0 0 12px var(--c); z-index: 2; }
+.alert-marker__core .cs-icon { width: 13px; height: 13px; stroke-width: 2.8; }
+.alert-marker::before, .alert-marker::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--c); animation: ring-out 1.8s ease-out infinite; }
+.alert-marker::after { animation-delay: .9s; }
+.alert-marker.is-closed::before, .alert-marker.is-closed::after { display: none; }
+.alert-marker.is-closed .alert-marker__core { filter: grayscale(.6); opacity: .8; }
+.alert-marker.is-escalated .alert-marker__core { box-shadow: 0 0 0 4px rgb(255 255 255 / .5), 0 0 18px var(--c); }
+.theme-dark .leaflet-tooltip { background: #0c1a35; color: #e8eef8; border-color: #1f3765; box-shadow: 0 6px 18px rgb(0 0 0 / .4); }
+.theme-dark .leaflet-tooltip-top::before { border-top-color: #0c1a35; }
+.theme-dark .leaflet-bar a { background: #0c1a35; color: #e8eef8; border-color: #1f3765; }
+.theme-dark .leaflet-control-attribution { background: rgb(6 15 32 / .7); color: #93a6c6; }
+.theme-dark .leaflet-control-attribution a { color: #b8c8e4; }
+
+/* --- Impression ---------------------------------------------------------------------- */
+@media print {
+  @page { margin: 12mm; }
+  .no-print { display: none !important; }
+  body.printing * { visibility: hidden; }
+  body.printing .print-target, body.printing .print-target * { visibility: visible; }
+  body.printing .print-target { position: absolute; inset: 0 auto auto 0; width: 240mm; box-shadow: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.print-report { background: #fff; }
+  body.print-report .theme-dark, body.print-report { --bg: #fff; --surface: #fff; --surface-2: #fff; --ink: #000; --muted: #444; --line: #ccc; }
+}

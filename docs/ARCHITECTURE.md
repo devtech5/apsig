@@ -7,6 +7,7 @@ Téléphones (page SOS, terrain, espace client)      PC centrale (supervision)
         │  HTTPS / long polling ou SSE                    │ SSE
         ▼                                                 ▼
 ┌──────────────────────────── server.js (Node, sans framework) ─────────────────────────────┐
+│ Next.js 16     pages React + Tailwind (app/, components/, lib/), rendu délégué par app.js     │
 │ src/app.js     routes, droits par rôle, temps réel (SSE + repli long polling), médias        │
 │ src/store.js   métier : alertes, routage, escalade, unités, plaques, abonnements, rapports   │
 │ src/trust.js   score de fiabilité        src/notify.js  messagerie (pilotes)                 │
@@ -19,6 +20,13 @@ Téléphones (page SOS, terrain, espace client)      PC centrale (supervision)
 - **Temps réel** : une seule fonction `dispatch` filtre les évènements par profil (centrale, témoin, client, agent). Transport SSE, avec repli automatique en long polling quand un proxy met le flux en tampon.
 - **Persistance** : documents JSON dans SQLite (WAL), sauvegarde quotidienne automatique (7 conservées) et `npm run backup`.
 - **Sécurité** : mots de passe hachés (scrypt), cookie de session `HttpOnly` + `SameSite=Lax`, actions authentifiées en JSON uniquement (anti-CSRF), limitation de débit (alertes, connexion, médias, USSD), validation des fichiers par signature binaire, médias réservés à la centrale.
+
+## Déploiement du front sur Vercel
+
+Vercel exécute Next.js en fonctions *serverless* : pas de processus permanent, donc ni base SQLite persistante, ni diffusion temps réel en mémoire, ni boucle d'escalade. Le déploiement se fait donc en deux parties :
+
+1. **API** (processus Node permanent : Render, Railway, Fly.io, VPS…) : `npm run api` (ou l'image Docker avec `API_ONLY=1`), volume persistant pour `DATA_DIR`, et `PUBLIC_URL` = adresse du front Vercel (encodée dans les QR codes).
+2. **Front** (Vercel) : variable `BACKEND_URL` = adresse HTTPS de l'API. `next.config.mjs` relaie alors `/api`, `/qr`, `/media`, `/demo` et `/client/demo` sur la même origine : cookies de session et temps réel fonctionnent sans CORS (le long polling prend le relais si le flux SSE est mis en tampon).
 
 ## Passage en production — feuille de route
 

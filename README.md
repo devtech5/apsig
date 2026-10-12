@@ -1,4 +1,4 @@
-# CODE-SECOURS CI — Prototype APSIG v0.2
+# CODE-SECOURS CI — Prototype APSIG v0.3
 
 **Plaque QR → page SOS → centrale de sécurité → unités terrain**, en temps réel, avec accès sans Internet (USSD/SMS).
 Toutes les données (titulaires, numéros, établissements, paiements) sont **fictives**. Seules les communes d'Abidjan sont réelles.
@@ -14,11 +14,20 @@ npm run demo
 
 | Commande | Usage |
 |---|---|
-| `npm run demo` | Démo : données réinitialisées + tunnel HTTPS (nécessite `cloudflared`) |
+| `npm run demo` | Démo : compilation du front, données réinitialisées + tunnel HTTPS (nécessite `cloudflared`) |
 | `npm run demo:local` | Démo sur le Wi-Fi local uniquement (téléphones sur le même réseau) |
-| `npm start` | Conserve les données entre deux lancements (base SQLite dans `data/`) |
+| `npm run dev` | Développement : rechargement à chaud du front (Next.js) |
+| `npm run build` puis `npm start` | Production : conserve les données entre deux lancements (base SQLite dans `data/`) |
+| `npm run api` | API seule, sans front (back-end d'un front déployé sur Vercel) |
 | `npm test` | 30 tests automatisés (métier + API) |
 | `npm run backup` | Sauvegarde à chaud de la base |
+
+## Pile technique
+
+- **Front-end** : [Next.js 16](https://nextjs.org) (App Router) + React 19, **Tailwind CSS v4**, Leaflet pour les cartes. Code dans `app/` (routes), `components/` (écrans et composants d'interface), `lib/` (API, temps réel, formats).
+- **Back-end** : Node.js ≥ 22.13 sans framework (`src/`), SQLite intégré (`node:sqlite`), temps réel par Server-Sent Events avec repli en long polling.
+- **Un seul processus, un seul port** : `server.js` sert l'API et délègue le rendu des pages à Next.js (compatible tunnel, réseau local et Docker).
+- **Déploiement séparé possible** : front sur Vercel (`BACKEND_URL` = adresse de l'API), API sur un hébergeur Node persistant (`npm run api`). Voir [Architecture](docs/ARCHITECTURE.md).
 
 Installer le tunnel (une seule fois, Windows) : `winget install Cloudflare.cloudflared`.
 
@@ -93,7 +102,7 @@ Docker : `docker compose up -d` (voir `docker-compose.yml`).
 
 ## Charte graphique
 
-Toutes les couleurs, polices, rayons et ombres sont centralisés dans [`public/css/theme.css`](public/css/theme.css) ; le logo provisoire est [`public/img/logo-apsig.svg`](public/img/logo-apsig.svg). L'application de la charte officielle se fait dans ces deux fichiers.
+Toutes les couleurs, polices, rayons et ombres sont des jetons Tailwind centralisés dans [`app/globals.css`](app/globals.css) (blocs `:root`, `.theme-dark` et `@theme`) ; le logo provisoire est [`public/img/logo-apsig.svg`](public/img/logo-apsig.svg). L'application de la charte officielle se fait dans ces deux fichiers.
 
 ## Documentation
 
@@ -107,3 +116,4 @@ Toutes les couleurs, polices, rayons et ombres sont centralisés dans [`public/c
 - Les tunnels rapides Cloudflare ne transmettent pas les Server-Sent Events : le navigateur bascule alors automatiquement en long polling (transparent pour l'utilisateur).
 - Langues locales (dioula, baoulé…) à produire avec des traducteurs natifs et des enregistrements audio.
 - Notifications push en arrière-plan (Web Push) : prévues, non incluses.
+- Fond de carte : Esri par défaut, avec repli automatique sur OpenStreetMap si le réseau bloque Esri.

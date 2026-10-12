@@ -1,7 +1,7 @@
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { readdirSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './src/db.js';
 import { createAuth } from './src/auth.js';
@@ -13,6 +13,10 @@ import { startTunnel } from './src/tunnel.js';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const args = new Set(process.argv.slice(2));
 const env = process.env;
+const DEV = args.has('--dev');
+// API seule (back-end hébergé séparément du front, ex. front sur Vercel) : Next.js n'est pas chargé.
+const API_ONLY = args.has('--api-only') || env.API_ONLY === '1';
+env.NODE_ENV ??= DEV ? 'development' : 'production';
 const PORT = Number(env.PORT) || 3000;
 const DEMO = env.DEMO !== '0'; // mode démo : numéros d'urgence non composables, accès rapide aux comptes
 const DATA_DIR = path.resolve(env.DATA_DIR || path.join(ROOT, 'data'));
@@ -50,11 +54,25 @@ const store = createStore({
 });
 if (args.has('--reset')) store.reset();
 
+// Front-end Next.js servi par le même processus (un seul port : réseau local, tunnel, Docker).
+let renderPage = null;
+let upgradeNext = null;
+if (!API_ONLY) {
+  if (!DEV && !existsSync(path.join(ROOT, '.next', 'BUILD_ID'))) {
+    console.error('\n  Front-end non compilé : lancez « npm run build » (ou « npm run dev » pour le développement).\n');
+    process.exit(1);
+  }
+  const { default: next } = await import('next');
+  const nextApp = next({ dev: DEV, dir: ROOT, hostname: 'localhost', port: PORT });
+  await nextApp.prepare();
+  renderPage = nextApp.getRequestHandler();
+  upgradeNext = nextApp.getUpgradeHandler(); // rechargement à chaud en développement
+}
+
 const app = createApp({
   store, auth, notifier, db,
   config: {
-    publicDir: path.join(ROOT, 'public'),
-    leafletDir: path.join(ROOT, 'node_modules', 'leaflet', 'dist'),
+    renderPage,
     mediaDir: path.join(DATA_DIR, 'media'),
     backupDir: BACKUP_DIR,
     demo: DEMO,
@@ -87,9 +105,10 @@ setTimeout(dailyMaintenance, 60000).unref();
 setInterval(dailyMaintenance, DAY).unref();
 
 const server = http.createServer(app.handler);
+if (upgradeNext) server.on('upgrade', (req, socket, head) => upgradeNext(req, socket, head));
 server.listen(PORT, '0.0.0.0', () => {
   const demoToken = store.plates.find((x) => x.code === 'ABJ-YOP-NIANGON-453').token;
-  console.log('\n  CODE-SECOURS CI — prototype APSIG v0.2 (données fictives)\n');
+  console.log('\n  CODE-SECOURS CI — prototype APSIG v0.3 (données fictives)\n');
   console.log(`  Accueil          http://localhost:${PORT}/`);
   console.log(`  Centrale         http://localhost:${PORT}/centrale`);
   console.log(`  Plaques          http://localhost:${PORT}/plaques`);

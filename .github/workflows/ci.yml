@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   pull_request:
 
 jobs:
@@ -18,9 +18,11 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - name: Vérification syntaxique
-        run: for f in server.js src/*.js scripts/*.js public/js/*.js; do node --check "$f"; done
+      - name: Vérification syntaxique (serveur)
+        run: for f in server.js src/*.js scripts/*.js; do node --check "$f"; done
       - run: npm test
+      - name: Construction du front-end (Next.js)
+        run: npx next build
 
   docker:
     runs-on: ubuntu-latest

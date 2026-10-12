@@ -7,9 +7,7 @@ import { sessionCookie } from './auth.js';
 import { COMMUNES, TARIFFS, MOBILE_MONEY, USSD_CODE } from './seed.js';
 
 const MIME = {
-  '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon',
-  '.json': 'application/json', '.webmanifest': 'application/manifest+json',
+  '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp',
   '.webm': 'audio/webm', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4',
 };
 
@@ -23,17 +21,16 @@ const MEDIA_TYPES = [
   { kind: 'audio', mime: 'audio/mp4', ext: '.m4a', test: (b) => b.subarray(4, 8).toString() === 'ftyp' },
 ];
 
-const PAGES = {
-  '/': { file: 'index.html' },
-  '/connexion': { file: 'connexion.html' },
-  '/centrale': { file: 'centrale.html', rank: 1 },
-  '/plaques': { file: 'plaques.html', rank: 1 },
-  '/terrain': { file: 'terrain.html', agent: true },
-  '/ussd': { file: 'ussd.html' },
+// Pages réservées : la redirection vers la connexion est faite ici, avant le rendu par Next.js.
+const PROTECTED_PAGES = {
+  '/centrale': { rank: 1 },
+  '/plaques': { rank: 1 },
+  '/terrain': { agent: true },
 };
 
+// `config.renderPage(req, res)` délègue tout ce qui n'est pas l'API au front-end Next.js.
 export function createApp({ store, auth, notifier, db, config }) {
-  const { publicDir, leafletDir, mediaDir, demo, rateLimit = 6, version = '0.2.0' } = config;
+  const { mediaDir, demo, rateLimit = 6, version = '0.3.0', renderPage } = config;
   const clients = new Set();
   const hits = new Map();
   const startedAt = Date.now();
@@ -506,21 +503,16 @@ export function createApp({ store, auth, notifier, db, config }) {
     let m;
 
     if (req.method === 'GET') {
-      const page = PAGES[p];
-      if (page) {
-        if ((page.rank !== undefined || page.agent) && !allowed(page, user)) {
-          const target = user?.role === 'agent' ? '/terrain' : user && page.agent ? '/centrale' : `/connexion?next=${encodeURIComponent(p)}`;
-          res.writeHead(302, { Location: target });
-          return res.end();
-        }
-        return serveFile(res, publicDir, page.file);
+      const page = PROTECTED_PAGES[p];
+      if (page && !allowed(page, user)) {
+        const target = user?.role === 'agent' ? '/terrain' : user && page.agent ? '/centrale' : `/connexion?next=${encodeURIComponent(p)}`;
+        res.writeHead(302, { Location: target });
+        return res.end();
       }
-      if (/^\/s\/[A-Za-z0-9]{6,32}$/.test(p)) return serveFile(res, publicDir, 'sos.html');
       if (p === '/client/demo' && demo) {
         res.writeHead(302, { Location: `/client/${store.plates.find((x) => x.code === 'ABJ-YOP-NIANGON-453').clientKey}` });
         return res.end();
       }
-      if (/^\/client\/[A-Za-z0-9]{8,40}$/.test(p)) return serveFile(res, publicDir, 'client.html');
       if (p === '/demo') {
         res.writeHead(302, { Location: `/s/${publicConfig().demoToken}` });
         return res.end();
@@ -535,9 +527,10 @@ export function createApp({ store, auth, notifier, db, config }) {
         if (!allowed(OPS, user)) throw httpError(403, 'Accès réservé à la centrale');
         return serveFile(res, mediaDir, m[1], { 'Cache-Control': 'private, max-age=3600' });
       }
-      if (p.startsWith('/vendor/leaflet/')) return serveFile(res, leafletDir, p.slice('/vendor/leaflet/'.length));
-      if (/^\/(css|js|img)\//.test(p) || p === '/favicon.svg' || p === '/manifest.webmanifest') return serveFile(res, publicDir, p);
     }
+
+    // Tout ce qui n'est pas l'API (pages, ressources /_next, fichiers publics) revient à Next.js.
+    if (renderPage && !p.startsWith('/api/')) return renderPage(req, res);
 
     for (const r of routes) {
       if (r.method !== req.method) continue;
