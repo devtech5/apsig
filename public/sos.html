@@ -11,18 +11,25 @@
   <link rel="stylesheet" href="/css/sos.css">
 </head>
 <body class="sos">
-  <div id="demo-ribbon" class="demo-ribbon" hidden>Prototype de démonstration : aucune alerte réelle n'est transmise aux secours.</div>
+  <div id="demo-ribbon" class="demo-ribbon" hidden></div>
   <header class="sos-header">
     <img src="/img/logo-apsig.svg" alt="">
     <div>
       <strong>CODE-SECOURS CI</strong>
-      <span>APSIG · Sécurité pour tous</span>
+      <span id="tagline">APSIG · Sécurité pour tous</span>
+    </div>
+    <div class="sos-header__tools">
+      <button type="button" id="listen" class="sos-tool" aria-label="Écouter les instructions"></button>
+      <div class="lang" role="group" aria-label="Langue">
+        <button type="button" data-lang="fr" aria-pressed="true">FR</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
     </div>
   </header>
   <main id="app" class="sos-main" aria-live="polite">
     <div class="sos-loading" aria-label="Chargement"><span></span></div>
   </main>
-  <footer class="sos-footer">Aucune application à installer · Service APSIG</footer>
+  <footer class="sos-footer" id="footer">Aucune application à installer · Service APSIG</footer>
   <script type="module" src="/js/sos.js"></script>
 </body>
 </html>

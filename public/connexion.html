@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b2a63">
+  <title>Connexion — APSIG</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/pages.css">
+</head>
+<body class="login-page">
+  <main class="login">
+    <a class="brand login__brand" href="/"><img src="/img/logo-apsig.svg" alt=""><div><strong>APSIG</strong><span>Code-Secours CI</span></div></a>
+    <section class="login__card">
+      <h1>Connexion</h1>
+      <p class="muted">Centrale de sécurité, back-office et application terrain.</p>
+      <form id="form" class="login__form" novalidate>
+        <label class="form-field">
+          <span>Identifiant</span>
+          <input id="username" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false">
+        </label>
+        <label class="form-field">
+          <span>Mot de passe</span>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <p id="error" class="form-error" role="alert" hidden></p>
+        <button class="btn btn--primary btn--lg btn--block" type="submit"><span data-icon="lock"></span>Se connecter</button>
+      </form>
+      <div id="demo" class="login__demo" hidden>
+        <h2>Accès rapide — démonstration</h2>
+        <p class="muted">Comptes fictifs. Les mots de passe de test figurent dans le README.</p>
+        <div class="login__group"><h3>Centrale</h3><div id="demo-ops" class="login__chips"></div></div>
+        <div class="login__group"><h3>Application terrain</h3><div id="demo-agents" class="login__chips"></div></div>
+      </div>
+    </section>
+    <p class="login__foot"><a href="/">← Retour à l'accueil</a></p>
+  </main>
+  <script type="module">
+    import { api, esc, icon } from '/js/common.js';
+    document.querySelectorAll('[data-icon]').forEach((el) => { el.outerHTML = icon(el.dataset.icon); });
+    const params = new URLSearchParams(location.search);
+    const next = params.get('next');
+    const target = (user) => (next && next.startsWith('/') && !next.startsWith('//') && !(user.role === 'agent') ? next : user.role === 'agent' ? '/terrain' : '/centrale');
+    const err = document.getElementById('error');
+    const fail = (msg) => { err.textContent = msg; err.hidden = false; };
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.hidden = true;
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if (!username || !password) return fail('Renseignez votre identifiant et votre mot de passe.');
+      try {
+        const { user } = await api('/api/auth/login', { method: 'POST', body: { username, password } });
+        location.href = target(user);
+      } catch (ex) { fail(ex.message); }
+    });
+
+    try {
+      const { accounts } = await api('/api/auth/demo-accounts');
+      const chip = (a) => {
+        const unit = a.name.match(/^(.*) \((Unité .+)\)$/);
+        return `<button type="button" class="chip-btn" data-user="${esc(a.username)}"><strong>${esc(unit ? unit[2] : a.roleLabel)}</strong><span>${esc(unit ? unit[1] : a.name)}</span></button>`;
+      };
+      document.getElementById('demo-ops').innerHTML = accounts.filter((a) => a.role !== 'agent').map(chip).join('');
+      document.getElementById('demo-agents').innerHTML = accounts.filter((a) => a.role === 'agent').map(chip).join('');
+      document.getElementById('demo').hidden = false;
+      document.getElementById('demo').addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-user]');
+        if (!b) return;
+        try {
+          const { user } = await api('/api/auth/demo', { method: 'POST', body: { username: b.dataset.user } });
+          location.href = target(user);
+        } catch (ex) { fail(ex.message); }
+      });
+    } catch { /* mode démo désactivé */ }
+  </script>
+</body>
+</html>

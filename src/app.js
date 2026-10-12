@@ -162,6 +162,8 @@ export function createApp({ store, auth, notifier, db, config }) {
   const publicConfig = () => ({
     baseUrl: config.getBaseUrl(), lanUrl: config.lanUrl, tunnelUrl: config.getTunnelUrl(), demo,
     demoToken: store.plates.find((x) => x.code === 'ABJ-YOP-NIANGON-453')?.token, ussdCode: USSD_CODE, version,
+    // Plaques vitrines : leurs QR sont publics par nature (imprimés sur les plaques).
+    showcase: store.plates.filter((x) => x.showcase && x.status === 'active').map((x) => ({ code: x.code, pass: x.pass, token: x.token, shortCode: x.shortCode })),
   });
 
   const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -465,6 +467,10 @@ export function createApp({ store, auth, notifier, db, config }) {
         return serveFile(res, publicDir, page.file);
       }
       if (/^\/s\/[A-Za-z0-9]{6,32}$/.test(p)) return serveFile(res, publicDir, 'sos.html');
+      if (p === '/client/demo' && demo) {
+        res.writeHead(302, { Location: `/client/${store.plates.find((x) => x.code === 'ABJ-YOP-NIANGON-453').clientKey}` });
+        return res.end();
+      }
       if (/^\/client\/[A-Za-z0-9]{8,40}$/.test(p)) return serveFile(res, publicDir, 'client.html');
       if (p === '/demo') {
         res.writeHead(302, { Location: `/s/${publicConfig().demoToken}` });

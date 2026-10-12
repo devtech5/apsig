@@ -8,6 +8,7 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/pages.css">
 </head>
 <body>
   <header class="site-header">
@@ -18,10 +19,12 @@
         <a href="/demo" target="_blank" rel="noopener">Page SOS</a>
         <a href="/centrale">Centrale</a>
         <a href="/plaques">Plaques</a>
+        <a href="/terrain">Terrain</a>
+        <a href="/ussd">USSD / SMS</a>
       </nav>
     </div>
   </header>
-  <div class="demo-ribbon">Prototype de démonstration — toutes les données (noms, numéros, adresses précises) sont fictives.</div>
+  <div class="demo-ribbon">Prototype de démonstration — toutes les données (noms, numéros, adresses précises, paiements) sont fictives.</div>
 
   <main>
     <section class="hero">
@@ -29,11 +32,11 @@
         <div>
           <div class="eyebrow">Code-Secours CI</div>
           <h1>De la plaque intelligente à la <em>coordination</em> des secours.</h1>
-          <p class="lead">Une adresse unique, un QR code, une alerte en un geste. La centrale APSIG localise, route et suit chaque urgence en temps réel.</p>
+          <p class="lead">Une adresse unique, un QR code, une alerte en un geste — même sans Internet. La centrale APSIG localise, route, escalade et suit chaque urgence en temps réel.</p>
           <div class="hero__actions">
             <a class="btn btn--danger btn--lg" href="/demo" target="_blank" rel="noopener"><span data-icon="smartphone"></span>Ouvrir la page SOS</a>
             <a class="btn btn--lg" href="/centrale"><span data-icon="monitor"></span>Centrale de sécurité</a>
-            <a class="btn btn--ghost btn--lg" href="/plaques"><span data-icon="qr"></span>Plaques</a>
+            <a class="btn btn--ghost btn--lg" href="/connexion"><span data-icon="lock"></span>Connexion</a>
           </div>
         </div>
         <div class="hero__plates" id="hero-plates"></div>
@@ -48,11 +51,12 @@
             <div class="eyebrow muted">Essayez maintenant</div>
             <h3>Scannez la plaque de démonstration</h3>
             <ol>
-              <li>Connectez votre téléphone au même réseau Wi-Fi que cet ordinateur.</li>
               <li>Scannez le QR code avec l'appareil photo : aucune application à installer.</li>
               <li>Choisissez le type d'urgence : l'alerte apparaît aussitôt sur la centrale.</li>
+              <li>Sans Internet : composez <strong class="mono" id="demo-ussd">*789*10001#</strong> (<a href="/ussd">simulateur</a>).</li>
             </ol>
             <span class="url-chip" id="demo-url">…</span>
+            <div class="net-panel" id="net"></div>
           </div>
         </div>
       </div>
@@ -60,25 +64,43 @@
 
     <section class="section" style="padding-top:0">
       <div class="container">
-        <h2>Les trois interfaces du prototype</h2>
+        <h2>Les interfaces du prototype</h2>
         <p class="muted">Chaque acteur dispose de son écran, synchronisé en temps réel.</p>
-        <div class="entry-grid">
+        <div class="entry-grid entry-grid--6">
           <a class="entry entry--sos" href="/demo" target="_blank" rel="noopener">
             <span class="entry__icon"><span data-icon="smartphone"></span></span>
             <h3>Page SOS publique</h3>
-            <p>Ce que voit le témoin après le scan : adresse vérifiée, 3 boutons d'urgence, suivi de l'intervention en direct.</p>
+            <p>Adresse vérifiée, 3 boutons, suivi en direct, position du témoin, photo et message vocal. Français et anglais, lecture audio.</p>
             <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
           </a>
           <a class="entry" href="/centrale">
             <span class="entry__icon"><span data-icon="monitor"></span></span>
             <h3>Centrale de sécurité</h3>
-            <p>Carte en temps réel, file d'alertes, affectation des unités, appels, notifications et historique horodaté.</p>
+            <p>Carte temps réel, sirène et annonce vocale, escalade, score de fiabilité, rapports, messagerie, sécurité.</p>
+            <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
+          </a>
+          <a class="entry" href="/terrain">
+            <span class="entry__icon"><span data-icon="navigation"></span></span>
+            <h3>Application terrain</h3>
+            <p>Les unités reçoivent la mission avec sonnerie, partagent leur GPS réel et clôturent sur place.</p>
             <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
           </a>
           <a class="entry" href="/plaques">
             <span class="entry__icon"><span data-icon="qr"></span></span>
-            <h3>Parc de plaques</h3>
-            <p>184 plaques Pass Bleu et Pass Rouge Premium, avec QR code sécurisé, titulaire et contacts à prévenir.</p>
+            <h3>Back-office des plaques</h3>
+            <p>Création, Pass Bleu / Rouge, régénération du QR, désactivation, encaissement Mobile Money.</p>
+            <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
+          </a>
+          <a class="entry" id="client-link" href="#">
+            <span class="entry__icon"><span data-icon="user"></span></span>
+            <h3>Espace client</h3>
+            <p>Le titulaire suit les alertes à son adresse, gère ses proches à prévenir et renouvelle son abonnement.</p>
+            <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
+          </a>
+          <a class="entry" href="/ussd">
+            <span class="entry__icon"><span data-icon="keypad"></span></span>
+            <h3>USSD &amp; SMS</h3>
+            <p>Alerte depuis n'importe quel téléphone, sans Internet : *789*CODE# ou « SOS CODE 1 » par SMS.</p>
             <span class="entry__go">Ouvrir <span data-icon="chevronRight"></span></span>
           </a>
         </div>
@@ -90,17 +112,17 @@
         <h2>Comment ça marche</h2>
         <p class="muted">De la plaque à l'intervention, en six étapes.</p>
         <div class="steps">
-          <div class="step"><h4>Plaque physique</h4><p>Adresse Code-Secours unique, QR sécurisé, position GPS vérifiée.</p></div>
+          <div class="step"><h4>Plaque physique</h4><p>Adresse Code-Secours unique, QR sécurisé, code USSD, position GPS vérifiée.</p></div>
           <div class="step"><h4>Scan</h4><p>Un geste simple depuis n'importe quel téléphone, sans application.</p></div>
           <div class="step"><h4>Page SOS</h4><p>Agression, malaise ou incendie : un seul appui.</p></div>
-          <div class="step"><h4>Plateforme APSIG</h4><p>Identification, horodatage, règles de routage, traçabilité.</p></div>
-          <div class="step"><h4>Centrale</h4><p>Vision globale : appeler, affecter, suivre l'intervention.</p></div>
+          <div class="step"><h4>Plateforme APSIG</h4><p>Horodatage, routage, score de fiabilité, escalade automatique.</p></div>
+          <div class="step"><h4>Centrale</h4><p>Appeler, affecter, suivre l'unité en direct, clôturer.</p></div>
           <div class="step"><h4>Acteurs notifiés</h4><p>Société partenaire, secours publics, chef de quartier, famille.</p></div>
         </div>
         <div class="keypoints">
           <span><span data-icon="check"></span>Sans application mobile</span>
+          <span><span data-icon="check"></span>Fonctionne sans Internet (USSD/SMS)</span>
           <span><span data-icon="check"></span>Localisation immédiate</span>
-          <span><span data-icon="check"></span>Simple pour tous</span>
           <span><span data-icon="check"></span>Suivi en temps réel</span>
           <span><span data-icon="check"></span>Pass Bleu &amp; Pass Rouge</span>
         </div>
@@ -108,20 +130,29 @@
     </section>
   </main>
 
-  <footer class="site-footer">APSIG · Code-Secours CI · Prototype v0.1 — Ensemble pour des communautés plus sûres</footer>
+  <footer class="site-footer">APSIG · Code-Secours CI · Prototype v0.2 — Ensemble pour des communautés plus sûres</footer>
 
   <script type="module">
-    import { api, icon, plateHTML } from '/js/common.js';
+    import { api, esc, icon, plateHTML } from '/js/common.js';
     document.querySelectorAll('[data-icon]').forEach((el) => { el.outerHTML = icon(el.dataset.icon); });
-    const cfg = await api('/api/config');
-    const url = `${cfg.baseUrl}/s/${cfg.demoToken}`;
-    document.getElementById('demo-qr').src = `/qr/${cfg.demoToken}.svg`;
-    document.getElementById('demo-url').textContent = url;
-    const { alerts, plates, ...rest } = await api('/api/ops/bootstrap');
-    const showcase = plates.filter((p) => p.showcase);
-    const blue = showcase.find((p) => p.code === 'ABJ-YOP-NIANGON-453');
+
+    async function refreshConfig() {
+      const cfg = await api('/api/config');
+      const url = `${cfg.baseUrl}/s/${cfg.demoToken}`;
+      document.getElementById('demo-qr').src = `/qr/${cfg.demoToken}.svg?b=${encodeURIComponent(cfg.baseUrl)}`;
+      document.getElementById('demo-url').textContent = url;
+      document.getElementById('net').innerHTML = cfg.tunnelUrl
+        ? `<span class="ok">✔ Tunnel HTTPS actif</span><span class="muted">Accessible depuis n'importe quel réseau, avec géolocalisation et micro.</span>`
+        : `<span class="muted">Réseau local : ${esc(cfg.lanUrl)} — les téléphones doivent être sur le même Wi-Fi. Pour un accès depuis n'importe quel réseau : <span class="mono">npm run demo</span>.</span>`;
+    }
+    await refreshConfig();
+    setInterval(() => refreshConfig().catch(() => {}), 10000);
+
+    const { showcase } = await api('/api/config');
+    const blue = showcase.find((p) => p.code === 'ABJ-YOP-NIANGON-453') ?? showcase[0];
     const red = showcase.find((p) => p.pass === 'rouge');
-    document.getElementById('hero-plates').innerHTML = plateHTML(blue) + plateHTML(red);
+    document.getElementById('hero-plates').innerHTML = [blue, red].filter(Boolean).map((p) => plateHTML(p)).join('');
+    document.getElementById('client-link').href = '/client/demo';
   </script>
 </body>
 </html>

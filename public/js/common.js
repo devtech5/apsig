@@ -41,6 +41,26 @@ const PATHS = {
   navigation: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   arrowLeft: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  plus: '<path d="M5 12h14M12 5v14"/>',
+  ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  keypad: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+  chart: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+  shieldCheck: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+  locate: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+  languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="1"/>',
 };
 
 export function icon(name, cls = '') {
@@ -62,6 +82,59 @@ export const STATUS_META = {
   annulee: { label: 'Annulée', cls: 'cancelled' },
 };
 export const OPEN_STATUSES = ['nouvelle', 'prise_en_charge', 'en_route', 'sur_place'];
+
+export const CALLBACK_META = {
+  en_attente: { label: 'Rappel du titulaire en cours', short: 'Rappel en cours', cls: 'warning' },
+  confirme: { label: 'Titulaire joint : urgence confirmée', short: 'Urgence confirmée', cls: 'success' },
+  en_securite: { label: 'Titulaire joint : en sécurité', short: 'Titulaire en sécurité', cls: '' },
+  injoignable: { label: 'Titulaire injoignable', short: 'Injoignable', cls: 'warning' },
+  fausse_alerte: { label: 'Titulaire : fausse alerte', short: 'Fausse alerte', cls: 'agression' },
+};
+export const TRUST_META = {
+  elevee: { label: 'Fiabilité élevée', cls: 'success' },
+  moyenne: { label: 'Fiabilité moyenne', cls: 'warning' },
+  faible: { label: 'Fiabilité faible', cls: 'agression' },
+};
+export const SOURCE_LABEL = { qr: 'QR code', ussd: 'USSD', sms: 'SMS', demo: 'Simulation' };
+
+export const fmtMoney = (n) => `${Number(n).toLocaleString('fr-FR')} FCFA`;
+
+export async function currentUser() {
+  try { return (await api('/api/auth/me')).user; } catch { return null; }
+}
+
+export async function logout() {
+  try { await api('/api/auth/logout', { method: 'POST' }); } finally { location.href = '/connexion'; }
+}
+
+// Synthèse vocale du navigateur (annonces de la centrale, consignes de la page SOS).
+export function speak(text, lang = 'fr-FR') {
+  try {
+    if (!('speechSynthesis' in window)) return false;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang;
+    u.rate = 1;
+    const voice = speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith(lang.slice(0, 2)));
+    if (voice) u.voice = voice;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Identifiant pseudonyme de l'appareil du témoin (lutte contre les abus, aucune donnée personnelle).
+export function deviceId() {
+  const store = storage('local');
+  let id = store.get('cs-device');
+  if (!id) {
+    const bytes = crypto.getRandomValues(new Uint8Array(5));
+    id = `d-${Array.from(bytes, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 8)}`;
+    store.set('cs-device', id);
+  }
+  return id;
+}
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -105,6 +178,7 @@ export function plateHTML(plate, { qr = true } = {}) {
     <div class="plate plate--${premium ? 'rouge' : 'bleu'}" style="--chars:${plate.code.length}" role="img" aria-label="Plaque ${esc(plate.code)} — Pass ${premium ? 'Rouge Premium' : 'Bleu'}">
       <div class="plate__head">CODE-SECOURS CI${premium ? ' PREMIUM' : ''}</div>
       <div class="plate__code">${esc(plate.code)}</div>
+      ${plate.shortCode ? `<div class="plate__ussd">Sans Internet : *789*${esc(plate.shortCode)}#</div>` : ''}
       <div class="plate__foot">
         <div class="plate__qr">${qr ? `<img src="/qr/${esc(plate.token)}.svg" alt="" loading="lazy">` : ''}</div>
         <div class="plate__brand">

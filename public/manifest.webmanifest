@@ -1,0 +1,10 @@
+{
+  "name": "APSIG Terrain",
+  "short_name": "APSIG",
+  "start_url": "/terrain",
+  "display": "standalone",
+  "background_color": "#071226",
+  "theme_color": "#050e1f",
+  "lang": "fr",
+  "icons": [{ "src": "/img/logo-apsig.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

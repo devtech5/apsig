@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/centrale.css">
+  <link rel="stylesheet" href="/css/pages.css">
 </head>
 <body class="theme-dark ops">
   <header class="ops-top">
@@ -19,21 +20,31 @@
     <nav class="ops-tabs" aria-label="Vues">
       <button type="button" data-view="supervision" aria-pressed="true"><span data-icon="map"></span>Supervision</button>
       <button type="button" data-view="historique" aria-pressed="false"><span data-icon="history"></span>Historique</button>
+      <button type="button" data-view="rapports" aria-pressed="false"><span data-icon="chart"></span>Rapports</button>
+      <button type="button" data-view="messages" aria-pressed="false"><span data-icon="message"></span>Messages</button>
+      <button type="button" data-view="securite" aria-pressed="false" data-min-rank="2" hidden><span data-icon="shieldCheck"></span>Sécurité</button>
       <a href="/plaques" target="_blank" rel="noopener"><span data-icon="qr"></span>Plaques</a>
     </nav>
     <div class="ops-top__right">
       <span id="live" class="live is-off">Connexion…</span>
       <span id="clock" class="clock mono">--:--:--</span>
-      <button type="button" id="sound" class="btn btn--sm btn--ghost" aria-pressed="true" title="Alerte sonore"></button>
+      <button type="button" id="qr-btn" class="btn btn--sm btn--ghost" title="Afficher le QR public en plein écran"><span data-icon="maximize"></span>QR public</button>
+      <button type="button" id="sound" class="btn btn--sm btn--ghost" aria-pressed="true" title="Sirène et annonce vocale"></button>
       <div class="sim">
-        <button type="button" id="sim-btn" class="btn btn--sm btn--danger" aria-haspopup="true" aria-expanded="false"><span data-icon="play"></span>Simuler une alerte<span data-icon="chevronDown"></span></button>
+        <button type="button" id="sim-btn" class="btn btn--sm btn--danger" aria-haspopup="true" aria-expanded="false"><span data-icon="play"></span>Simuler<span data-icon="chevronDown"></span></button>
         <div class="menu" id="sim-menu" hidden>
           <button type="button" data-sim="agression"><i class="dot dot--agression"></i>Agression / Intrusion</button>
           <button type="button" data-sim="medical"><i class="dot dot--medical"></i>Maladie / Accident</button>
           <button type="button" data-sim="incendie"><i class="dot dot--incendie"></i>Incendie</button>
           <button type="button" data-sim="random"><i class="dot"></i>Type aléatoire</button>
-          <hr>
-          <button type="button" data-sim="reset"><span data-icon="refresh"></span>Réinitialiser la démo</button>
+          <hr data-min-rank="2" hidden>
+          <button type="button" data-sim="reset" data-min-rank="2" hidden><span data-icon="refresh"></span>Réinitialiser la démo</button>
+        </div>
+      </div>
+      <div class="user-menu">
+        <button type="button" id="user-btn" class="user-chip" aria-haspopup="true" aria-expanded="false"><span class="user-chip__avatar" id="user-avatar"></span><span><strong id="user-name"></strong><small id="user-role"></small></span></button>
+        <div class="menu" id="user-dropdown" hidden>
+          <button type="button" id="logout"><span data-icon="logout"></span>Se déconnecter</button>
         </div>
       </div>
     </div>
@@ -60,42 +71,112 @@
         <span><i class="dot dot--bleu"></i>Pass Bleu</span>
         <span><i class="dot dot--rouge"></i>Pass Rouge</span>
         <span><i class="sq"></i>Unité APSIG</span>
+        <span><i class="sq sq--gps"></i>GPS réel</span>
+        <span><i class="dot dot--witness"></i>Témoin</span>
         <span><i class="dot dot--agression pulse"></i>Alerte active</span>
       </div>
     </section>
     <aside id="detail" class="detail" aria-label="Détail de l'alerte"></aside>
   </main>
 
-  <main id="view-historique" class="ops-history" hidden>
+  <main id="view-historique" class="ops-panel" hidden>
     <div class="h-head">
       <div>
         <h2>Historique &amp; traçabilité</h2>
         <p class="muted">Chaque alerte est horodatée de bout en bout : déclenchement, prise en charge, arrivée, clôture.</p>
       </div>
-      <a class="btn" href="/api/ops/alerts.csv"><span data-icon="download"></span>Exporter (CSV)</a>
+      <a class="btn" id="csv-link" href="/api/ops/alerts.csv?days=30"><span data-icon="download"></span>Exporter (CSV)</a>
     </div>
-    <div class="h-chart" id="h-chart" aria-label="Alertes des 8 derniers jours"></div>
     <div class="toolbar">
       <label class="field field--search"><span data-icon="search"></span><input id="h-q" type="search" placeholder="Code plaque, ID, quartier, issue…"></label>
       <select id="h-type" class="field" aria-label="Type">
         <option value="">Tous types</option><option value="agression">Agression</option><option value="medical">Médical</option><option value="incendie">Incendie</option>
       </select>
       <select id="h-status" class="field" aria-label="Statut">
-        <option value="">Tous statuts</option><option value="open">En cours</option><option value="cloturee">Clôturées</option><option value="annulee">Annulées</option>
+        <option value="">Tous statuts</option><option value="open">En cours</option><option value="cloturee">Clôturées</option><option value="annulee">Annulées</option><option value="fausse">Fausses alertes</option>
+      </select>
+      <select id="h-source" class="field" aria-label="Source">
+        <option value="">Toutes sources</option><option value="qr">QR code</option><option value="ussd">USSD</option><option value="sms">SMS</option><option value="demo">Simulation</option>
       </select>
       <select id="h-commune" class="field" aria-label="Commune"><option value="">Toutes communes</option></select>
       <select id="h-period" class="field" aria-label="Période">
-        <option value="today">Aujourd'hui</option><option value="7" selected>7 derniers jours</option><option value="all">Tout</option>
+        <option value="1">Aujourd'hui</option><option value="7" selected>7 derniers jours</option><option value="30">30 derniers jours</option>
       </select>
     </div>
     <div class="h-summary" id="h-summary"></div>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th>ID</th><th>Déclenchée</th><th>Plaque</th><th>Localisation</th><th>Type</th><th>Unité</th><th>Prise en charge</th><th>Arrivée</th><th>Statut</th><th>Issue</th></tr></thead>
+        <thead><tr><th>ID</th><th>Déclenchée</th><th>Source</th><th>Plaque</th><th>Localisation</th><th>Type</th><th>Unité</th><th>Prise en charge</th><th>Arrivée</th><th>Fiabilité</th><th>Statut</th><th>Issue</th></tr></thead>
         <tbody id="h-rows"></tbody>
       </table>
     </div>
   </main>
+
+  <main id="view-rapports" class="ops-panel" hidden>
+    <div class="h-head">
+      <div>
+        <h2>Rapports d'activité</h2>
+        <p class="muted">Synthèse pour la direction, les clients, les communes et les syndics.</p>
+      </div>
+      <div class="toolbar toolbar--tight">
+        <select id="r-days" class="field" aria-label="Période"><option value="7">7 jours</option><option value="30" selected>30 jours</option></select>
+        <button type="button" class="btn" id="r-print"><span data-icon="print"></span>Imprimer</button>
+      </div>
+    </div>
+    <div id="r-kpis" class="r-kpis"></div>
+    <div class="r-grid">
+      <section class="r-card r-card--map"><h3>Carte de chaleur par quartier</h3><div id="r-map"></div></section>
+      <section class="r-card"><h3>Alertes par jour</h3><div id="r-days-chart" class="h-chart h-chart--wide"></div></section>
+      <section class="r-card"><h3>Répartition horaire</h3><div id="r-hours" class="r-hours"></div></section>
+      <section class="r-card"><h3>Par commune</h3><div class="table-wrap"><table class="table"><thead><tr><th>Commune</th><th>Total</th><th>Agressions</th><th>Médical</th><th>Incendies</th><th>Arrivée moy.</th></tr></thead><tbody id="r-communes"></tbody></table></div></section>
+      <section class="r-card"><h3>Quartiers les plus exposés</h3><ol id="r-top" class="r-top"></ol></section>
+    </div>
+  </main>
+
+  <main id="view-messages" class="ops-panel" hidden>
+    <div class="h-head">
+      <div>
+        <h2>Messagerie sortante</h2>
+        <p class="muted">SMS, WhatsApp, appels vocaux et radio émis automatiquement. <span id="m-driver"></span></p>
+      </div>
+      <select id="m-channel" class="field" aria-label="Canal"><option value="">Tous les canaux</option><option>SMS</option><option>WhatsApp</option><option>Appel vocal</option><option>Appel + SMS</option><option>Radio</option></select>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Heure</th><th>Canal</th><th>Destinataire</th><th>Message</th><th>Alerte</th><th>Statut</th></tr></thead>
+        <tbody id="m-rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <main id="view-securite" class="ops-panel" hidden>
+    <div class="h-head">
+      <div>
+        <h2>Sécurité &amp; conformité</h2>
+        <p class="muted">Appareils suspects, journal d'audit, sauvegardes. Une alerte n'est jamais rejetée : un appareil bloqué voit sa fiabilité abaissée et ses déclenchements limités.</p>
+      </div>
+      <button type="button" class="btn" id="backup-btn" data-min-rank="3" hidden><span data-icon="database"></span>Sauvegarder maintenant</button>
+    </div>
+    <div class="r-grid r-grid--2">
+      <section class="r-card"><h3>Appareils des témoins</h3><div class="table-wrap"><table class="table"><thead><tr><th>Appareil</th><th>24 h</th><th>Plaques 24 h</th><th>Total</th><th>Dernière alerte</th><th>Statut</th><th></th></tr></thead><tbody id="s-devices"></tbody></table></div></section>
+      <section class="r-card"><h3>Journal d'audit</h3><div class="table-wrap table-wrap--tall"><table class="table"><thead><tr><th>Heure</th><th>Utilisateur</th><th>Action</th><th>Cible</th><th>Détail</th></tr></thead><tbody id="s-audit"></tbody></table></div></section>
+    </div>
+  </main>
+
+  <div id="qr-overlay" class="qr-overlay" hidden>
+    <div class="qr-overlay__inner">
+      <button type="button" class="btn btn--ghost qr-overlay__close" id="qr-close" aria-label="Fermer"><span data-icon="x"></span></button>
+      <div class="qr-overlay__qr"><img id="qr-img" alt="QR code de la plaque de démonstration"></div>
+      <div class="qr-overlay__text">
+        <div class="eyebrow">Scannez avec l'appareil photo</div>
+        <h2>Déclenchez une alerte de démonstration</h2>
+        <select id="qr-plate" class="field" aria-label="Plaque"></select>
+        <p class="qr-overlay__url mono" id="qr-url"></p>
+        <p class="qr-overlay__ussd">Sans Internet : composez <strong class="mono" id="qr-ussd"></strong></p>
+        <p class="muted" id="qr-net"></p>
+      </div>
+    </div>
+  </div>
 
   <dialog id="modal" class="modal"></dialog>
 

@@ -8,40 +8,52 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/pages.css">
 </head>
 <body>
   <header class="site-header">
     <div class="site-header__inner">
-      <a class="brand" href="/"><img src="/img/logo-apsig.svg" alt=""><div><strong>APSIG</strong><span>Sécurité pour tous, en toute confiance</span></div></a>
+      <a class="brand" href="/"><img src="/img/logo-apsig.svg" alt=""><div><strong>APSIG</strong><span>Back-office des plaques</span></div></a>
       <nav class="site-nav" aria-label="Navigation principale">
         <a href="/">Accueil</a>
-        <a href="/demo" target="_blank" rel="noopener">Page SOS</a>
         <a href="/centrale">Centrale</a>
         <a href="/plaques" aria-current="page">Plaques</a>
       </nav>
+      <div class="site-user"><span id="me"></span><button type="button" class="btn btn--sm" id="logout"><span data-icon="logout"></span></button></div>
     </div>
   </header>
-  <div class="demo-ribbon">Prototype de démonstration — titulaires, numéros et établissements fictifs.</div>
+  <div class="demo-ribbon">Prototype — titulaires, numéros, établissements et paiements fictifs.</div>
 
   <main class="container">
     <div class="page-head">
       <div>
         <h1>Parc de plaques</h1>
-        <p>Chaque plaque porte une adresse Code-Secours unique et un QR code menant à sa page SOS.</p>
+        <p>Adresse Code-Secours unique, QR code, code USSD et abonnement pour chaque plaque.</p>
       </div>
-      <div class="counts" id="counts"></div>
+      <div class="bo-head-right">
+        <div class="counts" id="counts"></div>
+        <button type="button" class="btn btn--primary" id="new-plate" hidden><span data-icon="plus"></span>Nouvelle plaque</button>
+      </div>
     </div>
-    <div class="toolbar">
-      <label class="field field--search"><span data-icon="search"></span><input id="q" type="search" placeholder="Code, quartier, titulaire, établissement…"></label>
-      <select id="pass" class="field" aria-label="Pass">
-        <option value="">Tous les Pass</option><option value="bleu">Pass Bleu</option><option value="rouge">Pass Rouge Premium</option>
-      </select>
-      <select id="commune" class="field" aria-label="Commune"><option value="">Toutes communes</option></select>
+    <div class="bo-tabs" role="group" aria-label="Vue">
+      <button type="button" data-tab="plates" aria-pressed="true">Plaques</button>
+      <button type="button" data-tab="payments" aria-pressed="false" hidden id="tab-payments">Paiements Mobile Money</button>
     </div>
-    <div class="plate-grid" id="grid"></div>
-    <div class="more"><button type="button" class="btn" id="more" hidden>Afficher plus</button></div>
+    <section id="view-plates">
+      <div class="toolbar">
+        <label class="field field--search"><span data-icon="search"></span><input id="q" type="search" placeholder="Code, code USSD, quartier, titulaire…"></label>
+        <select id="pass" class="field" aria-label="Pass"><option value="">Tous les Pass</option><option value="bleu">Pass Bleu</option><option value="rouge">Pass Rouge Premium</option></select>
+        <select id="commune" class="field" aria-label="Commune"><option value="">Toutes communes</option></select>
+        <select id="status" class="field" aria-label="Statut"><option value="">Tous statuts</option><option value="active">Actives</option><option value="inactive">Désactivées</option><option value="expired">Abonnement expiré</option></select>
+      </div>
+      <div class="plate-grid" id="grid"></div>
+      <div class="more"><button type="button" class="btn" id="more" hidden>Afficher plus</button></div>
+    </section>
+    <section id="view-payments" hidden>
+      <div class="table-wrap" style="margin-bottom:48px"><table class="table-light"><thead><tr><th>Date</th><th>Plaque</th><th>Opérateur</th><th>Numéro</th><th>Durée</th><th>Montant</th><th>Canal</th><th>Statut</th></tr></thead><tbody id="payments"></tbody></table></div>
+    </section>
   </main>
-
+  <dialog id="modal" class="modal"></dialog>
   <script type="module" src="/js/plaques.js"></script>
 </body>
 </html>
