@@ -1,17 +1,24 @@
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { readdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import QRCode from 'qrcode';
-import { createStore, httpError } from './src/store.js';
+import { openDb } from './src/db.js';
+import { createAuth } from './src/auth.js';
+import { createNotifier } from './src/notify.js';
+import { createStore } from './src/store.js';
+import { createApp } from './src/app.js';
+import { startTunnel } from './src/tunnel.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = path.join(ROOT, 'public');
-const LEAFLET_DIR = path.join(ROOT, 'node_modules', 'leaflet', 'dist');
-const PORT = Number(process.env.PORT) || 3000;
-// Mode démo : aucun vrai numéro n'est composable depuis la page SOS.
-const DEMO = process.env.DEMO !== '0';
+const args = new Set(process.argv.slice(2));
+const env = process.env;
+const PORT = Number(env.PORT) || 3000;
+const DEMO = env.DEMO !== '0'; // mode démo : numéros d'urgence non composables, accès rapide aux comptes
+const DATA_DIR = path.resolve(env.DATA_DIR || path.join(ROOT, 'data'));
+const DB_FILE = env.DB_FILE || path.join(DATA_DIR, 'code-secours.db');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const DAY = 86400000;
 
 function lanAddress() {
   const candidates = [];
@@ -24,227 +31,93 @@ function lanAddress() {
   }
   return candidates.find((ip) => ip.startsWith('192.168.')) ?? candidates.find((ip) => ip.startsWith('10.')) ?? candidates[0] ?? 'localhost';
 }
-const BASE_URL = (process.env.PUBLIC_URL || `http://${lanAddress()}:${PORT}`).replace(/\/$/, '');
 
-// --- Temps réel (Server-Sent Events) ---------------------------------------
-const clients = new Set();
+const lanUrl = `http://${lanAddress()}:${PORT}`;
+let tunnelUrl = null;
+const getBaseUrl = () => (env.PUBLIC_URL || tunnelUrl || lanUrl).replace(/\/$/, '');
 
-function send(res, event, data) {
-  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-}
-
-function emit(type, alert) {
-  for (const c of clients) {
-    if (c.scope === 'ops') {
-      if (type === 'units') send(c.res, 'units', store.units.map(store.publicUnit));
-      else if (type === 'reset') send(c.res, 'reset', {});
-      else {
-        send(c.res, type === 'alert:new' ? 'alert:new' : 'alert', store.opsAlert(alert));
-        send(c.res, 'stats', store.stats());
-      }
-    } else if (c.scope === 'reporter') {
-      if (type === 'units') {
-        // Rafraîchit l'ETA du témoin pendant le trajet (au plus toutes les 5 s).
-        const mine = store.alertById(c.alertId);
-        if (mine?.status === 'en_route' && Date.now() - (c.lastEta ?? 0) > 5000) {
-          c.lastEta = Date.now();
-          send(c.res, 'alert', store.publicAlert(mine));
-        }
-      } else if (alert && alert.id === c.alertId) {
-        send(c.res, 'alert', store.publicAlert(alert));
-      }
-    }
-  }
-}
-
-const store = createStore({ emit });
-setInterval(() => store.tick(), 1000).unref();
-setInterval(() => { for (const c of clients) c.res.write(': ping\n\n'); }, 20000).unref();
-
-function openStream(req, res, client) {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no',
-  });
-  res.write('retry: 2000\n\n');
-  const entry = { res, ...client };
-  clients.add(entry);
-  req.on('close', () => clients.delete(entry));
-  return entry;
-}
-
-// --- Utilitaires HTTP ------------------------------------------------------
-const MIME = {
-  '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.json': 'application/json',
-  '.webmanifest': 'application/manifest+json',
-};
-
-function json(res, status, data) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-  res.end(JSON.stringify(data));
-}
-
-async function readBody(req) {
-  let size = 0;
-  const chunks = [];
-  for await (const chunk of req) {
-    size += chunk.length;
-    if (size > 16 * 1024) throw httpError(413, 'Requête trop volumineuse');
-    chunks.push(chunk);
-  }
-  if (!chunks.length) return {};
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw httpError(400, 'JSON invalide'); }
-}
-
-async function serveFile(res, baseDir, relPath) {
-  const filePath = path.normalize(path.join(baseDir, relPath));
-  if (!filePath.startsWith(baseDir)) throw httpError(403, 'Accès refusé');
-  try {
-    const data = await readFile(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
-    res.end(data);
-  } catch {
-    throw httpError(404, 'Introuvable');
-  }
-}
-
-// Anti-abus minimal : N déclenchements par minute et par adresse IP (RATE_LIMIT, 6 par défaut).
-const RATE_LIMIT = Number(process.env.RATE_LIMIT) || 6;
-const hits = new Map();
-function rateLimit(ip) {
-  const now = Date.now();
-  const list = (hits.get(ip) ?? []).filter((t) => now - t < 60000);
-  if (list.length >= RATE_LIMIT) throw httpError(429, 'Trop de déclenchements. Patientez une minute ou appelez directement les secours.');
-  list.push(now);
-  hits.set(ip, list);
-}
-
-const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-const fmt = (ts) => (ts ? new Date(ts).toLocaleString('fr-FR') : '');
-
-// --- Routes ----------------------------------------------------------------
-const PAGES = { '/': 'index.html', '/centrale': 'centrale.html', '/plaques': 'plaques.html' };
-
-async function handle(req, res) {
-  const url = new URL(req.url, 'http://local');
-  const p = decodeURIComponent(url.pathname);
-  const m = (re) => p.match(re);
-  let r;
-
-  if (req.method === 'GET') {
-    if (PAGES[p]) return serveFile(res, PUBLIC_DIR, PAGES[p]);
-    if (m(/^\/s\/[A-Za-z0-9]{6,32}$/)) return serveFile(res, PUBLIC_DIR, 'sos.html');
-    if (p === '/demo') {
-      const plate = store.plates.find((x) => x.code === 'ABJ-YOP-NIANGON-453');
-      res.writeHead(302, { Location: `/s/${plate.token}` });
-      return res.end();
-    }
-    if ((r = m(/^\/qr\/([A-Za-z0-9]{6,32})\.svg$/))) {
-      if (!store.plateByToken(r[1])) throw httpError(404, 'Plaque inconnue');
-      const svg = await QRCode.toString(`${BASE_URL}/s/${r[1]}`, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0B1F44', light: '#FFFFFF' } });
-      res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' });
-      return res.end(svg);
-    }
-    if (p.startsWith('/vendor/leaflet/')) return serveFile(res, LEAFLET_DIR, p.slice('/vendor/leaflet/'.length));
-    if (/^\/(css|js|img)\//.test(p) || p === '/favicon.svg' || p === '/manifest.webmanifest') return serveFile(res, PUBLIC_DIR, p);
-
-    if (p === '/api/config') return json(res, 200, { baseUrl: BASE_URL, demo: DEMO, demoToken: store.plates.find((x) => x.code === 'ABJ-YOP-NIANGON-453').token });
-
-    // Public (page SOS) — n'expose ni titulaire ni contacts.
-    if ((r = m(/^\/api\/public\/plates\/([A-Za-z0-9]{6,32})$/))) {
-      const plate = store.plateByToken(r[1]);
-      if (!plate) throw httpError(404, 'Plaque inconnue');
-      return json(res, 200, { plate: store.publicPlate(plate), demo: DEMO });
-    }
-    if ((r = m(/^\/api\/public\/alerts\/(ALR-\d+)$/))) {
-      const a = store.alertById(r[1]);
-      if (!a || a.reporterKey !== url.searchParams.get('key')) throw httpError(404, 'Alerte introuvable');
-      return json(res, 200, { alert: store.publicAlert(a) });
-    }
-    if (p === '/api/public/events') {
-      const a = store.alertById(url.searchParams.get('alert'));
-      if (!a || a.reporterKey !== url.searchParams.get('key')) throw httpError(404, 'Alerte introuvable');
-      const c = openStream(req, res, { scope: 'reporter', alertId: a.id });
-      return send(c.res, 'alert', store.publicAlert(a));
-    }
-
-    // Centrale (prototype : pas encore d'authentification opérateur).
-    if (p === '/api/ops/bootstrap') {
-      return json(res, 200, {
-        alerts: store.alerts.map(store.opsAlert),
-        units: store.units.map(store.publicUnit),
-        plates: store.plates.map((x) => ({ token: x.token, code: x.code, pass: x.pass, kind: x.kind, label: x.label, commune: x.commune, quartier: x.quartier, lat: x.lat, lng: x.lng, owner: x.owner, contacts: x.contacts, community: x.community, installedAt: x.installedAt, showcase: x.showcase, status: x.status })),
-        stats: store.stats(),
-        baseUrl: BASE_URL,
-      });
-    }
-    if (p === '/api/ops/events') {
-      const c = openStream(req, res, { scope: 'ops' });
-      return send(c.res, 'hello', { at: Date.now() });
-    }
-    if (p === '/api/ops/alerts.csv') {
-      const head = ['ID', 'Déclenchée', 'Code plaque', 'Pass', 'Commune', 'Quartier', 'Type', 'Statut', 'Unité', 'Prise en charge (s)', 'Arrivée (min)', 'Clôture', 'Issue'];
-      const rows = [...store.alerts].reverse().map((a) => [a.id, fmt(a.createdAt), a.code, a.pass, a.commune, a.quartier, a.type, a.status, a.unitId ?? '',
-        a.ackAt ? Math.round((a.ackAt - a.createdAt) / 1000) : '', a.onSiteAt ? Math.round((a.onSiteAt - a.createdAt) / 60000) : '', fmt(a.closedAt), a.outcome ?? '']);
-      res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="historique-alertes-code-secours.csv"' });
-      return res.end('﻿' + [head, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n'));
-    }
-  }
-
-  if (req.method === 'POST') {
-    const body = await readBody(req);
-    if (p === '/api/public/alerts') {
-      rateLimit(req.socket.remoteAddress ?? 'unknown');
-      const { alert, duplicate } = store.createAlert({ token: String(body.token ?? ''), type: String(body.type ?? '') });
-      return json(res, 201, { alert: store.publicAlert(alert), key: alert.reporterKey, duplicate });
-    }
-    if ((r = m(/^\/api\/public\/alerts\/(ALR-\d+)\/cancel$/))) {
-      return json(res, 200, { alert: store.publicAlert(store.cancelByReporter(r[1], String(body.key ?? ''))) });
-    }
-    if ((r = m(/^\/api\/ops\/alerts\/(ALR-\d+)\/(ack|assign|onsite|close|call|note)$/))) {
-      const [, id, action] = r;
-      const a = action === 'ack' ? store.ack(id)
-        : action === 'assign' ? store.assign(id, String(body.unitId ?? ''))
-        : action === 'onsite' ? store.onSite(id)
-        : action === 'close' ? store.close(id, body.outcome)
-        : action === 'call' ? store.logCall(id, body.target)
-        : store.addNote(id, body.text);
-      return json(res, 200, { alert: store.opsAlert(a) });
-    }
-    if (p === '/api/ops/simulate') return json(res, 201, { alert: store.opsAlert(store.simulate(body.type)) });
-    if (p === '/api/ops/reset') {
-      store.reset();
-      emit('reset');
-      return json(res, 200, { ok: true });
-    }
-  }
-
-  throw httpError(404, 'Introuvable');
-}
-
-const server = http.createServer(async (req, res) => {
-  try {
-    await handle(req, res);
-  } catch (err) {
-    const status = err.status ?? 500;
-    if (status === 500) console.error(err);
-    if (res.headersSent) return res.end();
-    if (req.url.startsWith('/api/')) return json(res, status, { error: err.message });
-    res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end(status === 404 ? 'Page introuvable' : err.message);
-  }
+const db = openDb(DB_FILE);
+let broadcast = () => {};
+const emit = (type, payload) => broadcast(type, payload);
+const auth = createAuth({ db });
+const notifier = createNotifier({ db, emit });
+const store = createStore({
+  db, emit, notifier, auth,
+  config: {
+    baseUrl: getBaseUrl,
+    escalation: (env.ESCALATION_SECONDS || '60,120').split(',').map(Number).filter((n) => n > 0),
+  },
 });
+if (args.has('--reset')) store.reset();
 
+const app = createApp({
+  store, auth, notifier, db,
+  config: {
+    publicDir: path.join(ROOT, 'public'),
+    leafletDir: path.join(ROOT, 'node_modules', 'leaflet', 'dist'),
+    mediaDir: path.join(DATA_DIR, 'media'),
+    backupDir: BACKUP_DIR,
+    demo: DEMO,
+    rateLimit: Number(env.RATE_LIMIT) || 6,
+    lanUrl,
+    getBaseUrl,
+    getTunnelUrl: () => tunnelUrl,
+  },
+});
+broadcast = app.broadcast;
+
+// Boucle de simulation (déplacements, escalades) + maintenance quotidienne.
+setInterval(() => store.tick(), 1000).unref();
+
+function dailyMaintenance() {
+  store.applyRetention({
+    alertDays: Number(env.RETENTION_DAYS) || 365,
+    mediaDays: Number(env.MEDIA_RETENTION_DAYS) || 90,
+    removeFile: app.removeMediaFile,
+  });
+  try {
+    db.backup(path.join(BACKUP_DIR, `auto-${new Date().toISOString().slice(0, 10)}.db`));
+    const autos = readdirSync(BACKUP_DIR).filter((f) => f.startsWith('auto-')).sort();
+    for (const f of autos.slice(0, -7)) rmSync(path.join(BACKUP_DIR, f), { force: true });
+  } catch (err) {
+    console.error('Sauvegarde automatique impossible :', err.message);
+  }
+}
+setTimeout(dailyMaintenance, 60000).unref();
+setInterval(dailyMaintenance, DAY).unref();
+
+const server = http.createServer(app.handler);
 server.listen(PORT, '0.0.0.0', () => {
   const demoToken = store.plates.find((x) => x.code === 'ABJ-YOP-NIANGON-453').token;
-  console.log('\n  CODE-SECOURS CI — prototype APSIG (données fictives)\n');
-  console.log(`  Accueil         http://localhost:${PORT}/`);
-  console.log(`  Centrale        http://localhost:${PORT}/centrale`);
-  console.log(`  Plaques         http://localhost:${PORT}/plaques`);
-  console.log(`  Page SOS démo   ${BASE_URL}/s/${demoToken}`);
-  console.log(`\n  Téléphones (même Wi-Fi) : ${BASE_URL}/demo`);
-  console.log(`  Mode démo : ${DEMO ? 'oui (numéros d\'urgence non composables)' : 'non'}\n`);
+  console.log('\n  CODE-SECOURS CI — prototype APSIG v0.2 (données fictives)\n');
+  console.log(`  Accueil          http://localhost:${PORT}/`);
+  console.log(`  Centrale         http://localhost:${PORT}/centrale`);
+  console.log(`  Plaques          http://localhost:${PORT}/plaques`);
+  console.log(`  Terrain (unités) http://localhost:${PORT}/terrain`);
+  console.log(`  USSD / SMS       http://localhost:${PORT}/ussd`);
+  console.log(`  Page SOS démo    ${getBaseUrl()}/s/${demoToken}`);
+  console.log(`\n  Réseau local     ${lanUrl}/demo`);
+  console.log(`  Base de données  ${DB_FILE}`);
+  console.log(`  Mode démo        ${DEMO ? 'oui (accès rapide, numéros non composables)' : 'non'}\n`);
+
+  if (args.has('--tunnel') || env.TUNNEL === '1') {
+    console.log('  Ouverture du tunnel HTTPS…');
+    startTunnel({
+      port: PORT,
+      onUrl: (url) => {
+        tunnelUrl = url;
+        if (url) console.log(`\n  ✔ Tunnel HTTPS actif : ${url}\n    Les QR codes pointent désormais vers ${url}/s/…\n`);
+        broadcast('config');
+      },
+    });
+  }
 });
+
+function shutdown() {
+  server.close();
+  app.close();
+  db.close();
+  process.exit(0);
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
