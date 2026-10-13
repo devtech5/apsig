@@ -8,6 +8,12 @@
       "port": 3000
     },
     {
+      "name": "code-secours-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js", "--reset", "--tunnel"],
+      "port": 3000
+    },
+    {
       "name": "code-secours-dev",
       "runtimeExecutable": "node",
       "runtimeArgs": ["server.js", "--dev", "--reset"],
