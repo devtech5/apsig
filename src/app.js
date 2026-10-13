@@ -188,9 +188,15 @@ export function createApp({ store, auth, notifier, db, config }) {
 
   function clientIp(req) {
     const remote = req.socket.remoteAddress ?? 'unknown';
-    // Derrière le tunnel (connexion locale), l'adresse réelle est fournie par Cloudflare.
-    if (/^(::1|127\.|::ffff:127\.)/.test(remote)) {
-      const fwd = req.headers['cf-connecting-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+    // Derrière le tunnel (connexion locale) ou le proxy de l'hébergeur (TRUST_PROXY=1), l'adresse réelle est transmise en en-tête.
+    if (config.trustProxy || /^(::1|127\.|::ffff:127\.)/.test(remote)) {
+      const h = req.headers;
+      const first = (v) => String(v ?? '').split(',')[0].trim();
+      // Relayée par le front Vercel : Cloudflare ne voit que le serveur Vercel, qui transmet l'adresse du visiteur.
+      const viaVercel = h['x-vercel-id'] || h['x-vercel-forwarded-for'];
+      const fwd = viaVercel
+        ? first(h['x-vercel-forwarded-for'] ?? h['x-real-ip'] ?? h['x-forwarded-for'])
+        : first(h['cf-connecting-ip'] ?? h['x-forwarded-for']);
       if (fwd) return fwd;
     }
     return remote;

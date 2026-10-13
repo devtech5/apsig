@@ -95,10 +95,11 @@ En mode démo, la page de connexion propose un **accès rapide** en un clic. Les
 | `DATA_DIR` / `DB_FILE` | Emplacement des données | `./data` |
 | `ESCALATION_SECONDS` | Seuils d'escalade N1,N2 | `60,120` |
 | `RATE_LIMIT` | Déclenchements max par minute et par IP | `6` |
+| `TRUST_PROXY` | `1` derrière le proxy d'un hébergeur (Render…) : IP du visiteur lue dans les en-têtes | — |
 | `RETENTION_DAYS` / `MEDIA_RETENTION_DAYS` | Anonymisation des alertes / suppression des médias | `365` / `90` |
 | `NOTIFY_DRIVER` | Pilote de messagerie (`simulation`, `console`) | `simulation` |
 
-Docker : `docker compose up -d` (voir `docker-compose.yml`).
+Docker : `docker compose up -d` (voir `docker-compose.yml`). Render (API du front Vercel) : `render.yaml`, voir [Architecture](docs/ARCHITECTURE.md#api-sur-render-fichier-renderyaml-fourni).
 
 ## Charte graphique
 

@@ -28,6 +28,17 @@ Vercel exécute Next.js en fonctions *serverless* : pas de processus permanent, 
 1. **API** (processus Node permanent : Render, Railway, Fly.io, VPS…) : `npm run api` (ou l'image Docker avec `API_ONLY=1`), volume persistant pour `DATA_DIR`, et `PUBLIC_URL` = adresse du front Vercel (encodée dans les QR codes).
 2. **Front** (Vercel) : variable `BACKEND_URL` = adresse HTTPS de l'API. `next.config.mjs` relaie alors `/api`, `/qr`, `/media`, `/demo` et `/client/demo` sur la même origine : cookies de session et temps réel fonctionnent sans CORS (le long polling prend le relais si le flux SSE est mis en tampon).
 
+Sans `BACKEND_URL`, le front Vercel s'affiche mais toutes les fonctions (connexion, SOS, `/demo`) répondent 404.
+
+### API sur Render (fichier `render.yaml` fourni)
+
+1. Render ▸ **New ▸ Blueprint** ▸ dépôt `devtech5/apsig` ▸ **Apply**. Le service `code-secours-api` (plan Starter, région Francfort, disque de 1 Go monté sur `/var/data`) se construit et démarre en mode API seule.
+2. Vérifier `https://code-secours-api.onrender.com/api/health` (`"status":"ok"`).
+3. Vercel ▸ projet ▸ **Settings ▸ Environment Variables** : `BACKEND_URL` = l'adresse du service Render, environnement *Production*, puis **Deployments ▸ Redeploy** (les relais sont figés à la compilation).
+4. Contrôle : `https://apsig.vercel.app/demo` ouvre la page SOS ; les QR codes pointent vers `apsig.vercel.app` (`PUBLIC_URL`).
+
+`TRUST_PROXY=1` indique au serveur qu'il est derrière le proxy de l'hébergeur : l'adresse IP du visiteur (limitation de débit, appareils suspects) est lue dans les en-têtes transmis par Vercel et Render. Le plan gratuit de Render ne convient pas : mise en veille après 15 min (escalade et temps réel interrompus) et pas de disque (données perdues à chaque redémarrage).
+
 ## Passage en production — feuille de route
 
 | Sujet | Prototype | Production recommandée |

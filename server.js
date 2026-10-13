@@ -77,6 +77,7 @@ const app = createApp({
     backupDir: BACKUP_DIR,
     demo: DEMO,
     rateLimit: Number(env.RATE_LIMIT) || 6,
+    trustProxy: env.TRUST_PROXY === '1', // derrière le proxy d'un hébergeur (Render…) : lire l'adresse du visiteur
     lanUrl,
     getBaseUrl,
     getTunnelUrl: () => tunnelUrl,
