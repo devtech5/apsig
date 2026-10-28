@@ -1,0 +1,33 @@
+{
+  "name": "code-secours-ci",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Prototype CODE-SECOURS CI (APSIG) — plaque QR, page SOS, centrale de sécurité. Next.js + Tailwind CSS. Données fictives.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js --dev",
+    "build": "next build",
+    "start": "node server.js",
+    "demo": "next build && node server.js --reset --tunnel",
+    "demo:local": "next build && node server.js --reset",
+    "api": "node server.js --api-only",
+    "test": "node --test \"test/*.test.js\"",
+    "backup": "node scripts/backup.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "next": "^16.4.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "postcss": "^8.5.30",
+    "tailwindcss": "^4.3.3"
+  }
+}

@@ -1,0 +1,40 @@
+# Blueprint Render — API Code-Secours CI (le front reste sur Vercel).
+# Mise en ligne : Render ▸ New ▸ Blueprint ▸ dépôt devtech5/apsig ▸ Apply.
+# Ensuite, sur Vercel : BACKEND_URL = adresse de ce service (https://code-secours-api.onrender.com), puis Redeploy.
+services:
+  - type: web
+    name: code-secours-api
+    runtime: node
+    region: frankfurt # région Render la plus proche d'Abidjan
+    # Processus permanent obligatoire (escalade, temps réel) : le plan gratuit se met en veille
+    # après 15 min d'inactivité et n'a pas de disque (base remise à zéro à chaque redémarrage).
+    plan: starter
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js --api-only
+    healthCheckPath: /api/health
+    disk:
+      name: code-secours-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: API_ONLY
+        value: "1"
+      - key: DATA_DIR
+        value: /var/data
+      # Adresse du front encodée dans les QR codes et les liens SMS.
+      - key: PUBLIC_URL
+        value: https://apsig.vercel.app
+      # 0 = production : numéros d'urgence cliquables, accès rapide démo désactivé.
+      - key: DEMO
+        value: "1"
+      # Render place un proxy devant l'application : l'adresse du visiteur arrive en en-tête.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ESCALATION_SECONDS
+        value: "60,120"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"

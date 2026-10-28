@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgis/postgis:18-3.6-alpine
+    container_name: apsig-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: apsig
+      POSTGRES_PASSWORD: apsig
+      POSTGRES_DB: apsig
+    ports:
+      # 55432 : évite les PostgreSQL déjà installés sur le poste (5432, 5433…)
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - apsig-pgdata:/var/lib/postgresql
+
+  redis:
+    image: redis:8-alpine
+    container_name: apsig-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - apsig-redis:/data
+
+volumes:
+  apsig-pgdata:
+  apsig-redis:

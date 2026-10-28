@@ -1,0 +1,510 @@
+// CODE-SECOURS CI — schéma de données (cf. docs/CADRAGE.md)
+//
+// Conventions :
+// - Montants en FCFA : Int (le XOF n'a pas de centimes).
+// - Positions : lat/lng en Float (WGS84). Les colonnes PostGIS et leurs index spatiaux
+//   sont ajoutés par migration SQL quand les requêtes géographiques arrivent.
+// - Une urgence n'est jamais rejetée : ni abonnement expiré, ni appareil bloqué n'empêchent
+//   la création d'une alerte (cf. @apsig/domain).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Référentiel géographique ──────────────────────────────────────────────
+
+model Ville {
+  id        String     @id @default(cuid())
+  code      String     @unique // DAL, ABJ…
+  nom       String
+  communes  Commune[] // vide pour une ville sans découpage (Daloa)
+  quartiers Quartier[]
+}
+
+// Seulement pour les villes découpées en communes (Abidjan) : entre dans le code plaque.
+model Commune {
+  id        String     @id @default(cuid())
+  code      String // YOP, COC, PBT…
+  nom       String
+  villeId   String
+  ville     Ville      @relation(fields: [villeId], references: [id])
+  quartiers Quartier[]
+
+  @@unique([villeId, code])
+}
+
+model Quartier {
+  id        String   @id @default(cuid())
+  code      String // LOBIA, NIANGON…
+  nom       String
+  villeId   String
+  ville     Ville    @relation(fields: [villeId], references: [id])
+  communeId String?
+  commune   Commune? @relation(fields: [communeId], references: [id])
+  lat       Float
+  lng       Float
+  foyers    Foyer[]
+
+  // Code unique dans la ville, même à Abidjan (deux communes ne réutilisent pas un code).
+  @@unique([villeId, code])
+}
+
+// ─── Foyers & abonnés ──────────────────────────────────────────────────────
+
+model Foyer {
+  id              String          @id @default(cuid())
+  libelle         String // « Villa 453, Lobia »
+  adresse         String?
+  quartierId      String
+  quartier        Quartier        @relation(fields: [quartierId], references: [id])
+  lat             Float?
+  lng             Float?
+  adresseVerifiee Boolean         @default(false) // vrai après la pose d'un support fixe
+  cleClient       String          @unique // lien de l'espace client envoyé par SMS
+  creeLe          DateTime        @default(now())
+  membres         Membre[]
+  contacts        ContactUrgence[]
+  supports        Support[]
+  abonnements     Abonnement[]
+  paiements       Paiement[]
+  alertes         Alerte[]
+}
+
+enum RoleMembre {
+  TITULAIRE
+  CONJOINT
+  ENFANT
+  PARENT
+  AUTRE
+}
+
+model Membre {
+  id               String     @id @default(cuid())
+  foyerId          String
+  foyer            Foyer      @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  role             RoleMembre
+  prenom           String
+  nom              String
+  telephone        String?
+  anneeNaissance   Int?
+  // Données de santé : visibles par la centrale uniquement, jamais sur la page publique.
+  infosMedicales   String?
+  supports         Support[]
+
+  @@index([foyerId])
+}
+
+model ContactUrgence {
+  id           String    @id @default(cuid())
+  foyerId      String
+  foyer        Foyer     @relation(fields: [foyerId], references: [id], onDelete: Cascade)
+  nom          String
+  relation     String
+  telephone    String
+  ordre        Int       @default(1)
+  consentiLe   DateTime? // consentement du proche à être contacté
+
+  @@index([foyerId])
+}
+
+// ─── Supports & QR ─────────────────────────────────────────────────────────
+
+enum TypeSupport {
+  PORTAIL // QR extérieur, plaque au portail
+  INTERIEUR // QR intérieur, santé
+  BRACELET // bracelet enfant
+  CARTE_VOYAGEUR
+  CARTE_VEHICULE
+}
+
+enum StatutSupport {
+  STOCK // fabriqué, pas encore attribué
+  ACTIF
+  SUSPENDU
+  PERDU
+}
+
+model Support {
+  id          String        @id @default(cuid())
+  type        TypeSupport
+  code        String        @unique // code lisible imprimé (DAL-LOBIA-453, ENF-0453-01…)
+  jeton       String        @unique // encodé dans le QR, opaque
+  codeCourt   String        @unique // pour USSD / SMS (*789*CODE#)
+  statut      StatutSupport @default(STOCK)
+  foyerId     String?
+  foyer       Foyer?        @relation(fields: [foyerId], references: [id])
+  membreId    String? // porteur d'un support mobile (bracelet, carte)
+  membre      Membre?       @relation(fields: [membreId], references: [id])
+  vehicule    String? // immatriculation pour une carte véhicule
+  creeLe      DateTime      @default(now())
+  jetonsRevoques JetonRevoque[]
+  pose        Pose?
+  alertes     Alerte[]
+
+  @@index([foyerId])
+}
+
+model JetonRevoque {
+  jeton     String   @id
+  supportId String
+  support   Support  @relation(fields: [supportId], references: [id], onDelete: Cascade)
+  revoqueLe DateTime @default(now())
+}
+
+model Pose {
+  id        String   @id @default(cuid())
+  supportId String   @unique
+  support   Support  @relation(fields: [supportId], references: [id], onDelete: Cascade)
+  agentId   String
+  agent     Utilisateur @relation(fields: [agentId], references: [id])
+  lat       Float
+  lng       Float
+  precisionM Float?
+  photo     String?
+  poseLe    DateTime @default(now())
+}
+
+// ─── Formules, abonnements, paiements ─────────────────────────────────────
+
+// Achat + abonnement : prixFcfa paie les supports et la mise en service,
+// puis prixMensuelFcfa finance la centrale 24/7 à l'issue des mois inclus.
+model Formule {
+  id           String          @id @default(cuid())
+  code         String          @unique // ENFANT, MAISON, FAMILLE, SECURITE_PLUS
+  nom          String
+  prixFcfa     Int
+  prixMensuelFcfa Int?         // null tant que le tarif n'est pas fixé
+  moisInclus   Int             @default(0)
+  intervention Boolean         @default(false) // équipe d'intervention APSIG sur agression
+  actif        Boolean         @default(true)
+  composition  FormuleSupport[]
+  abonnements  Abonnement[]
+}
+
+model FormuleSupport {
+  formuleId String
+  formule   Formule     @relation(fields: [formuleId], references: [id], onDelete: Cascade)
+  type      TypeSupport
+  quantite  Int         @default(1)
+
+  @@id([formuleId, type])
+}
+
+enum StatutAbonnement {
+  ESSAI
+  ACTIF
+  EXPIRE
+  RESILIE
+}
+
+model Abonnement {
+  id        String           @id @default(cuid())
+  foyerId   String
+  foyer     Foyer            @relation(fields: [foyerId], references: [id])
+  formuleId String
+  formule   Formule          @relation(fields: [formuleId], references: [id])
+  statut    StatutAbonnement @default(ACTIF)
+  debut     DateTime
+  fin       DateTime
+  paiements Paiement[]
+
+  @@index([foyerId])
+}
+
+enum Operateur {
+  ORANGE_MONEY
+  MTN_MOMO
+  MOOV_MONEY
+  WAVE
+  ESPECES
+}
+
+enum StatutPaiement {
+  EN_ATTENTE
+  REUSSI
+  ECHOUE
+}
+
+model Paiement {
+  id            String         @id @default(cuid())
+  foyerId       String
+  foyer         Foyer          @relation(fields: [foyerId], references: [id])
+  abonnementId  String?
+  abonnement    Abonnement?    @relation(fields: [abonnementId], references: [id])
+  montantFcfa   Int
+  operateur     Operateur
+  telephone     String?
+  statut        StatutPaiement @default(EN_ATTENTE)
+  refFournisseur String?       @unique
+  creeLe        DateTime       @default(now())
+  payeLe        DateTime?
+}
+
+// ─── Partenaires, unités, utilisateurs ─────────────────────────────────────
+
+enum TypePartenaire {
+  POLICE
+  GSPM
+  SAMU
+  AMBULANCE_PRIVEE
+  INFIRMIER
+  SECURITE_PRIVEE
+}
+
+model Partenaire {
+  id        String         @id @default(cuid())
+  type      TypePartenaire
+  nom       String
+  telephone String
+  villeCode String? // null = national
+  actif     Boolean        @default(true)
+  unites    Unite[]
+  tarifs    Tarif[]
+}
+
+model Tarif {
+  id            String     @id @default(cuid())
+  partenaireId  String
+  partenaire    Partenaire @relation(fields: [partenaireId], references: [id])
+  libelle       String
+  prixJourFcfa  Int
+  prixNuitFcfa  Int?
+}
+
+enum TypeUnite {
+  PATROUILLE
+  INTERVENTION
+  INFIRMIER
+  AMBULANCE
+}
+
+enum StatutUnite {
+  DISPONIBLE
+  EN_MISSION
+  HORS_SERVICE
+}
+
+model Unite {
+  id           String      @id @default(cuid())
+  nom          String
+  type         TypeUnite
+  statut       StatutUnite @default(DISPONIBLE)
+  partenaireId String?
+  partenaire   Partenaire? @relation(fields: [partenaireId], references: [id])
+  lat          Float?
+  lng          Float?
+  gpsLe        DateTime?
+  agents       Utilisateur[]
+  alertes      Alerte[]
+}
+
+enum RoleUtilisateur {
+  AGENT
+  OPERATEUR
+  SUPERVISEUR
+  ADMIN
+}
+
+// Les tables de session/compte de Better Auth seront ajoutées avec l'API.
+model Utilisateur {
+  id         String          @id @default(cuid())
+  nom        String
+  email      String          @unique
+  role       RoleUtilisateur
+  uniteId    String?
+  unite      Unite?          @relation(fields: [uniteId], references: [id])
+  actif      Boolean         @default(true)
+  creeLe     DateTime        @default(now())
+  poses      Pose[]
+  alertesTraitees Alerte[]   @relation("Operateur")
+  evenements EvenementAlerte[]
+  audit      Audit[]
+}
+
+// ─── Alertes ───────────────────────────────────────────────────────────────
+
+enum TypeUrgence {
+  AGRESSION
+  MEDICAL
+  INCENDIE
+  EGARE
+  SOINS
+  AUTRE
+}
+
+enum Priorite {
+  CRITIQUE
+  HAUTE
+  NORMALE
+}
+
+enum StatutAlerte {
+  NOUVELLE
+  PRISE_EN_CHARGE
+  EN_ROUTE
+  SUR_PLACE
+  CLOTUREE
+  ANNULEE
+}
+
+enum SourceAlerte {
+  QR
+  USSD
+  SMS
+  CENTRALE
+}
+
+enum StatutRappel {
+  EN_ATTENTE
+  CONFIRME
+  EN_SECURITE
+  INJOIGNABLE
+  FAUSSE_ALERTE
+}
+
+model Alerte {
+  id              String        @id @default(cuid())
+  numero          String        @unique // ALR-000123
+  type            TypeUrgence
+  priorite        Priorite
+  statut          StatutAlerte  @default(NOUVELLE)
+  source          SourceAlerte
+  supportId       String
+  support         Support       @relation(fields: [supportId], references: [id])
+  foyerId         String?
+  foyer           Foyer?        @relation(fields: [foyerId], references: [id])
+  // Position de référence : adresse du foyer (support fixe) ou GPS du témoin (support mobile)
+  lat             Float?
+  lng             Float?
+  // Témoin (pseudonymisé, effacé à l'anonymisation)
+  appareilId      String?
+  appareil        Appareil?     @relation(fields: [appareilId], references: [id])
+  temoinTelephone String?
+  temoinLat       Float?
+  temoinLng       Float?
+  temoinPrecisionM Float?
+  cleTemoin       String        @unique // autorise le témoin à suivre / annuler
+  // Traitement
+  scoreFiabilite  Int
+  rappel          StatutRappel  @default(EN_ATTENTE)
+  niveauEscalade  Int           @default(0)
+  redeclenchements Int          @default(0)
+  abonnementExpire Boolean      @default(false)
+  intervention    Boolean       @default(false) // formule du foyer au moment de l'alerte
+  operateurId     String?
+  operateur       Utilisateur?  @relation("Operateur", fields: [operateurId], references: [id])
+  uniteId         String?
+  unite           Unite?        @relation(fields: [uniteId], references: [id])
+  issue           String?
+  creeLe          DateTime      @default(now())
+  priseEnChargeLe DateTime?
+  surPlaceLe      DateTime?
+  clotureLe       DateTime?
+  anonymiseLe     DateTime?
+  evenements      EvenementAlerte[]
+  medias          Media[]
+  messages        Message[]
+
+  @@index([statut, creeLe])
+  @@index([supportId, type, statut])
+}
+
+model EvenementAlerte {
+  id       String       @id @default(cuid())
+  alerteId String
+  alerte   Alerte       @relation(fields: [alerteId], references: [id], onDelete: Cascade)
+  le       DateTime     @default(now())
+  nature   String // temoin, systeme, operateur, terrain, message
+  texte    String
+  auteurId String?
+  auteur   Utilisateur? @relation(fields: [auteurId], references: [id])
+
+  @@index([alerteId, le])
+}
+
+enum TypeMedia {
+  PHOTO
+  VOCAL
+  TEXTE
+}
+
+model Media {
+  id        String    @id @default(cuid())
+  alerteId  String
+  alerte    Alerte    @relation(fields: [alerteId], references: [id], onDelete: Cascade)
+  type      TypeMedia
+  chemin    String?
+  texte     String?
+  mime      String?
+  tailleOctets Int?
+  creeLe    DateTime  @default(now())
+}
+
+// ─── Communications ────────────────────────────────────────────────────────
+
+enum Canal {
+  SMS
+  WHATSAPP
+  APPEL
+  PUSH
+  RADIO
+}
+
+enum StatutMessage {
+  EN_FILE
+  ENVOYE
+  DELIVRE
+  ECHEC
+}
+
+model Message {
+  id            String        @id @default(cuid())
+  alerteId      String?
+  alerte        Alerte?       @relation(fields: [alerteId], references: [id])
+  canal         Canal
+  destinataire  String
+  nomDestinataire String?
+  texte         String
+  statut        StatutMessage @default(EN_FILE)
+  pilote        String
+  refFournisseur String?
+  erreur        String?
+  creeLe        DateTime      @default(now())
+  delivreLe     DateTime?
+
+  @@index([alerteId])
+}
+
+// ─── Sécurité ──────────────────────────────────────────────────────────────
+
+model Appareil {
+  id        String   @id // identifiant pseudonyme aléatoire généré par la page d'alerte
+  premiereVue DateTime @default(now())
+  bloque    Boolean  @default(false)
+  bloqueLe  DateTime?
+  note      String?
+  alertes   Alerte[]
+}
+
+// Séquences métier (numéros ALR-000123…), incrémentées par un upsert atomique.
+model Compteur {
+  nom    String @id
+  valeur Int
+}
+
+model Audit {
+  id        String       @id @default(cuid())
+  le        DateTime     @default(now())
+  auteurId  String?
+  auteur    Utilisateur? @relation(fields: [auteurId], references: [id])
+  action    String // support.creer, alerte.cloturer, appareil.bloquer…
+  cible     String
+  details   Json?
+
+  @@index([le])
+}

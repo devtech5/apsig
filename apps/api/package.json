@@ -1,0 +1,37 @@
+{
+  "name": "@apsig/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc-watch -p tsconfig.build.json --onSuccess \"node --enable-source-maps dist/main.js\"",
+    "start": "node --enable-source-maps dist/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apsig/db": "workspace:*",
+    "@apsig/domain": "workspace:*",
+    "@nestjs/common": "^11",
+    "@nestjs/core": "^11",
+    "@nestjs/platform-express": "^11",
+    "@nestjs/throttler": "^6",
+    "reflect-metadata": "^0.2",
+    "rxjs": "^7",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11",
+    "@swc/core": "^1",
+    "@types/node": "^22",
+    "@types/pg": "^8",
+    "@types/supertest": "^6",
+    "pg": "^8.16.0",
+    "supertest": "^7",
+    "tsc-watch": "^7",
+    "typescript": "^5",
+    "unplugin-swc": "^1",
+    "vitest": "^3"
+  }
+}
