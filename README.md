@@ -62,7 +62,7 @@ Deux applications Dokploy, construites depuis ce dépôt (branche `main`) avec *
 
 | Application | Dockerfile | Port | Domaine |
 |---|---|---|---|
-| API | `apps/api/Dockerfile` | 4000 | `api.<domaine>` |
+| API | `Dockerfile` (racine, valeur par défaut ; copie de `apps/api/Dockerfile`) | 4000 | `api.<domaine>` |
 | Page d'alerte | `apps/alerte/Dockerfile` | 3001 | `alerte.<domaine>` (URL encodée dans les QR) |
 
 Variables de l'**API** (les migrations sont appliquées à chaque démarrage) :
