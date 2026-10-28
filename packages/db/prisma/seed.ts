@@ -1,10 +1,13 @@
 // Données de démonstration — toutes les personnes et numéros privés sont FICTIFS.
 // Coordonnées des quartiers de Daloa approximatives, à corriger sur le terrain.
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { codeSupport, genererJeton, urlAlerte, type TypeSupport } from "@apsig/domain";
 import { createPrismaClient } from "../src/index.ts";
 
-process.loadEnvFile(path.resolve(import.meta.dirname, "../../../.env"));
+// En conteneur, pas de .env : les variables viennent de l'environnement.
+const envFile = path.resolve(import.meta.dirname, "../../../.env");
+if (existsSync(envFile)) process.loadEnvFile(envFile);
 const prisma = createPrismaClient();
 
 const QUARTIERS_DALOA = [
