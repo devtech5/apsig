@@ -1,6 +1,6 @@
 {
   "$schema": "https://turborepo.com/schema.json",
-  "globalEnv": ["DATABASE_URL", "REDIS_URL", "PUBLIC_ALERT_URL", "API_PORT"],
+  "globalEnv": ["DATABASE_URL", "REDIS_URL", "PUBLIC_ALERT_URL", "API_PORT", "NEXT_PUBLIC_API_URL", "API_INTERNAL_URL"],
   "tasks": {
     "generate": {
       "cache": false

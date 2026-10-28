@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+packages/db/src/generated
+.env
+.env.*
+!.env.example
+.git
+.claude
+reference
+docs
+**/Dockerfile
+.dockerignore
