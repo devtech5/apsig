@@ -46,3 +46,34 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .pulsation { animation: none; }
 }
+
+/* Viseur du scanner : quatre coins blancs, sans image. */
+.viseur {
+  --c: 2.25rem;
+  background:
+    linear-gradient(white, white) top left / var(--c) 4px,
+    linear-gradient(white, white) top left / 4px var(--c),
+    linear-gradient(white, white) top right / var(--c) 4px,
+    linear-gradient(white, white) top right / 4px var(--c),
+    linear-gradient(white, white) bottom left / var(--c) 4px,
+    linear-gradient(white, white) bottom left / 4px var(--c),
+    linear-gradient(white, white) bottom right / var(--c) 4px,
+    linear-gradient(white, white) bottom right / 4px var(--c);
+  background-repeat: no-repeat;
+  box-shadow: 0 0 0 100vmax rgb(15 27 51 / 0.45);
+  border-radius: 0.75rem;
+}
+
+@keyframes balayage {
+  0%, 100% { top: 8%; }
+  50% { top: 92%; }
+}
+
+.ligne-scan {
+  animation: balayage 2.4s ease-in-out infinite;
+  box-shadow: 0 0 12px rgb(255 255 255 / 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ligne-scan { animation: none; top: 50%; }
+}

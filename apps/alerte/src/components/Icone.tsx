@@ -60,6 +60,34 @@ const TRACES: Record<NomIcone, React.ReactNode> = {
       <path d="M12 17h.01" />
     </>
   ),
+  camera: (
+    <>
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21" />
+    </>
+  ),
+  lampe: (
+    <>
+      <path d="M18 6c0 2-2 2-2 4v10a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V10c0-2-2-2-2-4V2h12z" />
+      <path d="M6 6h12" />
+      <path d="M12 12v.01" />
+    </>
+  ),
+  qr: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3" />
+    </>
+  ),
 };
 
 export function Icone({ nom, className = "size-6" }: { nom: NomIcone; className?: string }) {

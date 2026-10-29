@@ -21,7 +21,8 @@ const config: NextConfig = {
           // Le jeton du QR ne doit fuiter vers aucun autre site.
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Permissions-Policy", value: "geolocation=(self), camera=(), microphone=()" },
+          // Caméra : uniquement pour le scanner de la page d'accueil.
+          { key: "Permissions-Policy", value: "geolocation=(self), camera=(self), microphone=()" },
         ],
       },
     ];
