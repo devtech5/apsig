@@ -14,15 +14,17 @@ const DUREE_AVIS_MS = 3000;
 const ERREURS = {
   refus: {
     titre: "Accès à la caméra refusé",
-    message: "Autorisez la caméra dans les réglages du navigateur, ou importez une photo du QR code.",
+    message: "Autorisez la caméra dans les réglages du navigateur, puis réessayez.",
   },
-  absente: { titre: "Aucune caméra trouvée", message: "Importez une photo du QR code à la place." },
+  absente: {
+    titre: "Aucune caméra trouvée",
+    message: "Scannez le QR code avec l'application appareil photo du téléphone.",
+  },
   nonSupporte: {
     titre: "Caméra indisponible",
-    message: "Ce navigateur ne donne pas accès à la caméra ici. Ouvrez l'appareil photo du téléphone ou importez une photo.",
+    message: "Ce navigateur ne donne pas accès à la caméra ici. Scannez le QR code avec l'application appareil photo du téléphone.",
   },
   echec: { titre: "La caméra n'a pas démarré", message: "Fermez les autres applications qui l'utilisent, puis réessayez." },
-  photo: { titre: "Aucun QR code lu", message: "Reprenez la photo bien à plat, nette et sans reflet, le QR code entier dans l'image." },
   etranger: { titre: "QR code non reconnu", message: "Ce QR code n'appartient pas à CODE-SECOURS. Scannez le QR d'une plaque, d'un bracelet ou d'une carte APSIG." },
 } satisfies Record<string, Erreur>;
 
@@ -142,22 +144,6 @@ export function ScannerQr() {
     setEtat("repos");
   };
 
-  const importerPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fichier = e.target.files?.[0];
-    e.target.value = "";
-    if (!fichier) return;
-    setErreur(null);
-    try {
-      const [image, lire] = await Promise.all([createImageBitmap(fichier), obtenirDecodeur()]);
-      const texte = await lire(image);
-      image.close();
-      if (!texte) setErreur(ERREURS.photo);
-      else if (!traiter(texte)) setErreur(ERREURS.etranger);
-    } catch {
-      setErreur(ERREURS.photo);
-    }
-  };
-
   // Caméra coupée quand la page passe en arrière-plan (batterie, voyant allumé) et en quittant la page.
   useEffect(() => {
     const surVisibilite = () => {
@@ -262,15 +248,8 @@ export function ScannerQr() {
             {erreur ? "Réessayer avec la caméra" : "Scanner avec la caméra"}
           </button>
         )}
-        {etat !== "trouve" && (
-          <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl font-semibold text-brand ring-1 ring-ligne focus-within:ring-2 focus-within:ring-brand active:bg-brand-clair">
-            <Icone nom="image" className="size-5" />
-            Importer une photo du QR code
-            <input type="file" accept="image/*" onChange={importerPhoto} className="sr-only" />
-          </label>
-        )}
         <p className="mt-1 text-center text-xs text-attenue">
-          L'image reste sur votre téléphone : elle n'est ni enregistrée ni envoyée.
+          L'image de la caméra reste sur votre téléphone : elle n'est ni enregistrée ni envoyée.
         </p>
       </div>
     </section>
