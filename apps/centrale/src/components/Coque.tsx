@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { type Espace, LIBELLES_ROLE } from "@apsig/domain";
+import { type Espace, LIBELLES_ESPACE, LIBELLES_ROLE } from "@apsig/domain";
 import type { Presence } from "@/lib/api";
 import { useCentrale } from "./Centrale";
 import { Icone, type NomIcone } from "./Icone";
@@ -62,6 +62,11 @@ export function Coque({ children }: { children: React.ReactNode }) {
         <Menu />
       </header>
       {centrale?.file?.crise.actif && <BandeauCrise />}
+      {!compte.deuxFacteursRequis && liens.length === 0 && (
+        <p role="status" className="bg-brand-clair px-4 py-2 text-sm text-brand print:hidden">
+          Votre compte s'utilise dans l'application mobile APSIG ({compte.espaces.map((e) => LIBELLES_ESPACE[e]).join(", ")}). Ici, vous pouvez gérer la sécurité du compte.
+        </p>
+      )}
       <div className="flex-1">{children}</div>
     </div>
   );

@@ -1,6 +1,6 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@apsig/db";
-import { aAcces, peutGererRole, REPARTITION, type Role } from "@apsig/domain";
+import { aAcces, LIBELLES_TYPE_UNITE, peutGererRole, REPARTITION, type Role, type StatutUnite, type TypeUnite } from "@apsig/domain";
 import type { UtilisateurConnecte } from "../auth/auth.module.ts";
 import { definirMotDePasse } from "../auth/comptes.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
@@ -18,7 +18,7 @@ export class AdministrationService {
 
   async comptes(acteur: UtilisateurConnecte) {
     const maintenant = Date.now();
-    const comptes = await this.db.utilisateur.findMany({ orderBy: [{ actif: "desc" }, { nom: "asc" }] });
+    const comptes = await this.db.utilisateur.findMany({ orderBy: [{ actif: "desc" }, { nom: "asc" }], include: { unite: { select: { id: true, nom: true } } } });
     return comptes.map((c) => ({
       id: c.id,
       nom: c.nom,
@@ -30,6 +30,7 @@ export class AdministrationService {
       enLigne: c.vuLe != null && maintenant - c.vuLe.getTime() < REPARTITION.signeDeVieS * 1000,
       vuLe: c.vuLe,
       creeLe: c.creeLe,
+      unite: c.unite,
       gerable: c.id !== acteur.id && peutGererRole(acteur.role, c.role as Role),
     }));
   }
@@ -44,15 +45,21 @@ export class AdministrationService {
     return { compte: { id: utilisateur.id, email: utilisateur.email }, motDePasse };
   }
 
-  async modifierCompte(id: string, d: { nom?: string | undefined; role?: Role | undefined; actif?: boolean | undefined }, acteur: UtilisateurConnecte) {
+  async modifierCompte(
+    id: string,
+    d: { nom?: string | undefined; role?: Role | undefined; actif?: boolean | undefined; uniteId?: string | null | undefined },
+    acteur: UtilisateurConnecte,
+  ) {
     const cible = await this.cible(id, acteur);
     if (d.role && d.role !== cible.role) this.verifierRole(acteur, d.role);
+    if (d.uniteId && !(await this.db.unite.findUnique({ where: { id: d.uniteId } }))) throw new BadRequestException("Unité inconnue");
     await this.db.utilisateur.update({
       where: { id },
       data: {
         ...(d.nom !== undefined && { nom: d.nom }),
         ...(d.role !== undefined && { role: d.role }),
         ...(d.actif !== undefined && { actif: d.actif }),
+        ...(d.uniteId !== undefined && { uniteId: d.uniteId }),
       },
     });
     const desactive = d.actif === false && cible.actif;
@@ -66,6 +73,7 @@ export class AdministrationService {
       ...(d.nom !== undefined && { nom: d.nom }),
       ...(d.role !== undefined && { de: cible.role, vers: d.role }),
       ...(d.actif !== undefined && { actif: d.actif }),
+      ...(d.uniteId !== undefined && { uniteId: d.uniteId }),
     });
     return this.comptes(acteur);
   }
@@ -77,6 +85,27 @@ export class AdministrationService {
     const { motDePasse } = await definirMotDePasse(this.db, { email: cible.email });
     await this.auditer(acteur, "compte.reinitialiser", cible.email, {});
     return { motDePasse };
+  }
+
+  // ─── Unités terrain ───────────────────────────────────────────────────────
+
+  async unites() {
+    const unites = await this.db.unite.findMany({ include: { agents: { select: { id: true, nom: true, actif: true } } }, orderBy: { nom: "asc" } });
+    return unites.map((u) => ({ id: u.id, nom: u.nom, type: u.type, libelleType: LIBELLES_TYPE_UNITE[u.type], statut: u.statut, agents: u.agents }));
+  }
+
+  async creerUnite(d: { nom: string; type: TypeUnite }, acteur: UtilisateurConnecte) {
+    const u = await this.db.unite.create({ data: { nom: d.nom, type: d.type, statut: "HORS_SERVICE" } });
+    await this.auditer(acteur, "unite.creer", u.nom, { type: d.type });
+    return this.unites();
+  }
+
+  async modifierUnite(id: string, d: { nom?: string | undefined; type?: TypeUnite | undefined; statut?: StatutUnite | undefined }, acteur: UtilisateurConnecte) {
+    const u = await this.db.unite.findUnique({ where: { id } });
+    if (!u) throw new NotFoundException("Unité introuvable");
+    await this.db.unite.update({ where: { id }, data: { ...(d.nom !== undefined && { nom: d.nom }), ...(d.type !== undefined && { type: d.type }), ...(d.statut !== undefined && { statut: d.statut }) } });
+    await this.auditer(acteur, "unite.modifier", u.nom, { ...d });
+    return this.unites();
   }
 
   async journal(action: string | undefined, page: number) {

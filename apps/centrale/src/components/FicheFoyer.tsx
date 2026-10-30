@@ -12,9 +12,10 @@ import {
   TYPES_SUPPORT,
 } from "@apsig/domain";
 import { AVEC_PORTEUR, COULEUR_ETAT, COULEUR_SUPPORT, date, fcfa, type Contact, type Foyer, type Membre, type Referentiel } from "@/lib/abonnements";
-import type { Position } from "@/lib/api";
+import { appelApi, type Position } from "@/lib/api";
+import { dateHeure } from "@/lib/format";
 import { ChampsSouscription, ChoixAdresse, lireSouscription } from "./ChampsAbonnement";
-import { Bloc, BOUTON, BOUTON_DISCRET, BOUTON_SECONDAIRE, CHAMP, Champ, valeur } from "./Formulaire";
+import { Bloc, BOUTON, BOUTON_DISCRET, BOUTON_SECONDAIRE, CHAMP, Champ, Erreur, valeur } from "./Formulaire";
 import { Icone } from "./Icone";
 
 // Envoie une modification ; vrai si elle a réussi (la fiche est alors déjà à jour).
@@ -299,8 +300,24 @@ function BlocSupports({ f, agir, envoi }: PropsBloc) {
   );
 }
 
+// Code d'activation de l'application mobile : affiché une seule fois, à remettre au membre.
+type CodeApplication = { pour: string; code: string; expireLe: string; telephone: string };
+
 function BlocMembres({ f, agir, envoi }: PropsBloc) {
   const [edite, setEdite] = useState<string | null>(null);
+  const [code, setCode] = useState<CodeApplication | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  async function genererCode(m: Membre) {
+    setErreur(null);
+    try {
+      const r = await appelApi<Omit<CodeApplication, "pour">>(`/abonnements/membres/${m.id}/code-application`, {});
+      setCode({ pour: `${m.prenom} ${m.nom}`, ...r });
+    } catch (e) {
+      setErreur((e as Error).message);
+    }
+  }
+
   return (
     <Bloc
       titre={`Membres (${f.membres.length})`}
@@ -311,6 +328,21 @@ function BlocMembres({ f, agir, envoi }: PropsBloc) {
       }
     >
       {edite === "nouveau" && <FormMembre foyerId={f.id} agir={agir} envoi={envoi} fermer={() => setEdite(null)} />}
+      <Erreur message={erreur} />
+      {code && (
+        <div role="status" className="mb-3 grid gap-1 rounded-xl border-2 border-brand bg-brand-clair p-3 text-sm">
+          <p>
+            Code de l'application pour <strong>{code.pour}</strong>, à saisir avec le numéro <strong>{code.telephone}</strong>. Valable jusqu'au{" "}
+            {dateHeure(code.expireLe)}, une seule fois ; il ne sera plus affiché.
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="rounded-lg bg-white px-3 py-1.5 font-mono text-xl font-bold tracking-[0.3em] select-all">{code.code}</code>
+            <button onClick={() => setCode(null)} className={`${BOUTON_DISCRET} ml-auto`}>
+              C'est remis, masquer
+            </button>
+          </div>
+        </div>
+      )}
       <ul className="grid gap-2 text-sm">
         {f.membres.map((m) =>
           edite === m.id ? (
@@ -329,6 +361,11 @@ function BlocMembres({ f, agir, envoi }: PropsBloc) {
               </span>
               {m.infosMedicalesRenseignees && <span className="rounded bg-danger-fond px-1.5 py-0.5 text-xs font-semibold text-danger">Santé renseignée</span>}
               <span className="ml-auto flex gap-1">
+                {m.telephone && (
+                  <button disabled={envoi} onClick={() => void genererCode(m)} className="text-xs text-brand underline">
+                    {m.applications.length ? "Relier un autre téléphone" : "Code d'application"}
+                  </button>
+                )}
                 <button onClick={() => setEdite(m.id)} className="text-xs text-brand underline">
                   Modifier
                 </button>
@@ -342,6 +379,22 @@ function BlocMembres({ f, agir, envoi }: PropsBloc) {
                   </button>
                 )}
               </span>
+              {m.applications.map((a) => (
+                <span key={a.id} className="flex w-full items-center gap-2 pl-3 text-xs text-attenue">
+                  <span className="rounded bg-succes-fond px-1.5 py-0.5 font-semibold text-succes">Application reliée</span>
+                  {a.appareil ?? "Téléphone"} · {a.vuLe ? `vue le ${dateHeure(a.vuLe)}` : `reliée le ${dateHeure(a.creeLe)}`}
+                  <button
+                    disabled={envoi}
+                    onClick={() =>
+                      confirm(`Déconnecter l'application de ${m.prenom} ? Elle ne pourra plus déclencher d'alerte ni recevoir les notifications.`) &&
+                      void agir(`/abonnements/applications/${a.id}`, undefined, "DELETE")
+                    }
+                    className="ml-auto text-danger underline"
+                  >
+                    Déconnecter
+                  </button>
+                </span>
+              ))}
             </li>
           ),
         )}

@@ -36,6 +36,8 @@ export type Membre = {
   telephone: string | null;
   anneeNaissance: number | null;
   infosMedicalesRenseignees: boolean;
+  // Téléphones reliés à l'application mobile APSIG.
+  applications: { id: string; appareil: string | null; creeLe: string; vuLe: string | null }[];
 };
 
 export type Contact = { id: string; nom: string; relation: string; telephone: string; ordre: number; consentiLe: string | null };

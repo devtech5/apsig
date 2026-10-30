@@ -4,6 +4,7 @@ import type { AlerteDetail, MembreEquipe } from "@/lib/api";
 import { dateHeure, duree, heure, lienCarte } from "@/lib/format";
 import { Carte } from "./Carte";
 import { Icone, STYLE_URGENCE } from "./Icone";
+import { UniteTerrain } from "./UniteTerrain";
 
 const ACTIONS: Record<StatutAlerte, string> = {
   NOUVELLE: "",
@@ -161,6 +162,7 @@ export function FicheAlerte({ a, maintenant, agir, onChoisir, equipe }: Props) {
               ...(a.position ? [{ ...a.position, type: a.type, libelle: `Intervention · ${a.numero}` }] : []),
               ...(a.temoin ? [{ ...a.temoin, temoin: true, libelle: "Témoin" }] : []),
               ...a.temoinsRattaches.flatMap((t) => (t.temoin ? [{ ...t.temoin, temoin: true, libelle: `Témoin ${t.numero}` }] : [])),
+              ...(a.unite?.position && ouverte ? [{ lat: a.unite.position.lat, lng: a.unite.position.lng, libelle: `Unité ${a.unite.nom}` }] : []),
             ]}
           />
           <p className="pointer-events-none absolute top-3 left-3 rounded-lg bg-white/95 px-3 py-1.5 text-sm font-semibold shadow">
@@ -238,6 +240,8 @@ export function FicheAlerte({ a, maintenant, agir, onChoisir, equipe }: Props) {
           </div>
         </Bloc>
       )}
+
+      {(a.unite || (a.peutAgir && ouverte && !a.principale)) && <UniteTerrain a={a} maintenant={maintenant} envoi={envoi} envoyer={envoyer} />}
 
       {!ouverte && a.issue && (
         <Bloc titre="Issue">

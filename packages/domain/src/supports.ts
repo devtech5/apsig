@@ -1,8 +1,9 @@
 import { randomBytes } from "node:crypto";
 
-// Valeurs alignées sur l'enum TypeSupport de @apsig/db.
+// Valeurs alignées sur l'enum TypeSupport de @apsig/db. TYPES_SUPPORT liste les supports imprimés (QR) ;
+// APPLI est le téléphone d'un abonné relié à l'application APSIG : il déclenche sans QR.
 export const TYPES_SUPPORT = ["PORTAIL", "INTERIEUR", "BRACELET", "CARTE_VOYAGEUR", "CARTE_VEHICULE"] as const;
-export type TypeSupport = (typeof TYPES_SUPPORT)[number];
+export type TypeSupport = (typeof TYPES_SUPPORT)[number] | "APPLI";
 
 export const SUPPORTS: Record<TypeSupport, { libelle: string; fixe: boolean; prefixe: string }> = {
   PORTAIL: { libelle: "QR portail (extérieur)", fixe: true, prefixe: "" },
@@ -10,7 +11,10 @@ export const SUPPORTS: Record<TypeSupport, { libelle: string; fixe: boolean; pre
   BRACELET: { libelle: "Bracelet enfant", fixe: false, prefixe: "ENF" },
   CARTE_VOYAGEUR: { libelle: "Carte voyageur", fixe: false, prefixe: "VOY" },
   CARTE_VEHICULE: { libelle: "Carte véhicule", fixe: false, prefixe: "VEH" },
+  APPLI: { libelle: "Application APSIG", fixe: false, prefixe: "APP" },
 };
+
+export const estImprime = (type: TypeSupport) => type !== "APPLI";
 
 // Support fixe : la position de référence est l'adresse du foyer.
 // Support mobile : c'est le GPS du témoin.
@@ -41,7 +45,8 @@ export function codeSupport(
       if (!p.ville || !p.quartier) throw new Error("Ville et quartier requis pour un QR portail");
       return [p.ville, p.commune, p.quartier].filter(Boolean).map((s) => slug(s!)).join("-") + `-${pad(p.numero, 3)}${suffixe}`;
     case "BRACELET":
-      return `ENF-${pad(p.numero, 4)}-${pad(p.rang ?? 1, 2)}`;
+    case "APPLI":
+      return `${SUPPORTS[type].prefixe}-${pad(p.numero, 4)}-${pad(p.rang ?? 1, 2)}`;
     default:
       return `${SUPPORTS[type].prefixe}-${pad(p.numero, 4)}${suffixe}`;
   }

@@ -100,11 +100,12 @@ describe("Accès au back-office", () => {
     expect(connexion.status).toBe(403);
   });
 
-  it("refuse un agent de pose", async () => {
+  it("cantonne l'agent de pose à la pose des supports (application mobile)", async () => {
     const { agent, connexion } = await connecter("AGENT");
     expect(connexion.status).toBe(200);
-    await agent.get("/compte").expect(403);
+    expect((await agent.get("/compte").expect(200)).body.espaces).toEqual(["pose"]);
     await agent.get("/centrale/alertes").expect(403);
+    await agent.get("/abonnements/foyers").expect(403);
   });
 
   it("ouvre à chaque rôle ses espaces, et seulement eux", async () => {
@@ -112,11 +113,15 @@ describe("Accès au back-office", () => {
     expect((await op.agent.get("/compte").expect(200)).body).toMatchObject({ id: op.utilisateur.id, role: "OPERATEUR", espaces: ["centrale"] });
 
     const conseiller = await connecter("CONSEILLER");
-    expect((await conseiller.agent.get("/compte").expect(200)).body.espaces).toEqual(["abonnements"]);
+    expect((await conseiller.agent.get("/compte").expect(200)).body.espaces).toEqual(["abonnements", "pose"]);
     await conseiller.agent.get("/centrale/alertes").expect(403);
 
     const superadmin = await connecter("SUPERADMIN");
-    expect((await superadmin.agent.get("/compte").expect(200)).body.espaces).toEqual(["centrale", "supervision", "abonnements", "administration"]);
+    expect((await superadmin.agent.get("/compte").expect(200)).body.espaces).toEqual(["centrale", "supervision", "abonnements", "administration", "pose"]);
+
+    const intervenant = await connecter("INTERVENANT");
+    expect((await intervenant.agent.get("/compte").expect(200)).body.espaces).toEqual(["terrain"]);
+    await intervenant.agent.get("/centrale/alertes").expect(403);
   });
 });
 

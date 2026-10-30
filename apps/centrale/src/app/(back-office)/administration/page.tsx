@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { LIBELLES_ROLE, peutGererRole, ROLES, type Role } from "@apsig/domain";
+import { LIBELLES_ROLE, LIBELLES_STATUT_UNITE, LIBELLES_TYPE_UNITE, peutGererRole, ROLES, TYPES_UNITE, type Role, type StatutUnite } from "@apsig/domain";
 import { Bloc, BOUTON, BOUTON_DISCRET, CHAMP, Champ, Erreur, valeur } from "@/components/Formulaire";
 import { useSession } from "@/components/Session";
 import { appelApi } from "@/lib/api";
@@ -19,7 +19,9 @@ type CompteAdmin = {
   vuLe: string | null;
   creeLe: string;
   gerable: boolean;
+  unite: { id: string; nom: string } | null;
 };
+type UniteAdmin = { id: string; nom: string; type: string; libelleType: string; statut: StatutUnite; agents: { id: string; nom: string; actif: boolean }[] };
 type Journal = { total: number; page: number; parPage: number; entrees: { id: string; le: string; action: string; cible: string; details: unknown; auteur: string | null }[] };
 
 // Mot de passe à remettre en main propre : affiché une seule fois, jamais stocké en clair.
@@ -46,8 +48,13 @@ export default function PageAdministration() {
   const [envoi, setEnvoi] = useState(false);
   const rolesPermis = ROLES.filter((r) => peutGererRole(compte.role, r));
 
+  const [unites, setUnites] = useState<UniteAdmin[] | null>(null);
   const charger = useCallback(() => appelApi<CompteAdmin[]>("/administration/comptes").then(setComptes, (e: Error) => setErreur(e.message)), []);
-  useEffect(() => void charger(), [charger]);
+  const chargerUnites = useCallback(() => appelApi<UniteAdmin[]>("/administration/unites").then(setUnites, (e: Error) => setErreur(e.message)), []);
+  useEffect(() => {
+    void charger();
+    void chargerUnites();
+  }, [charger, chargerUnites]);
 
   async function executer<T>(action: () => Promise<T>) {
     setEnvoi(true);
@@ -76,8 +83,25 @@ export default function PageAdministration() {
     }
   }
 
-  const modifier = (c: CompteAdmin, corps: Partial<Pick<CompteAdmin, "role" | "actif">>) =>
-    executer(async () => setComptes(await appelApi<CompteAdmin[]>(`/administration/comptes/${c.id}`, corps, "PATCH")));
+  const modifier = (c: CompteAdmin, corps: Partial<Pick<CompteAdmin, "role" | "actif">> & { uniteId?: string | null }) =>
+    executer(async () => {
+      setComptes(await appelApi<CompteAdmin[]>(`/administration/comptes/${c.id}`, corps, "PATCH"));
+      if (corps.uniteId !== undefined) void chargerUnites();
+    });
+
+  async function creerUnite(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const d = new FormData(form);
+    const r = await executer(() => appelApi<UniteAdmin[]>("/administration/unites", { nom: valeur(d, "nom"), type: d.get("type") }));
+    if (r) {
+      setUnites(r);
+      form.reset();
+    }
+  }
+
+  const modifierUnite = (u: UniteAdmin, corps: { statut: StatutUnite }) =>
+    executer(async () => setUnites(await appelApi<UniteAdmin[]>(`/administration/unites/${u.id}`, corps, "PATCH")));
 
   async function reinitialiser(c: CompteAdmin) {
     if (!confirm(`Réinitialiser le mot de passe de ${c.nom} ? Ses sessions seront fermées et la double authentification sera à refaire.`)) return;
@@ -171,6 +195,25 @@ export default function PageAdministration() {
                     ) : (
                       LIBELLES_ROLE[c.role]
                     )}
+                    {c.role === "INTERVENANT" &&
+                      (c.gerable && c.actif ? (
+                        <select
+                          value={c.unite?.id ?? ""}
+                          disabled={envoi}
+                          onChange={(e) => void modifier(c, { uniteId: e.target.value || null })}
+                          className="mt-1 block rounded border border-ligne bg-white px-2 py-1 text-xs"
+                          aria-label={`Unité de ${c.nom}`}
+                        >
+                          <option value="">Sans unité</option>
+                          {unites?.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.nom}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="block text-xs text-attenue">{c.unite?.nom ?? "Sans unité"}</span>
+                      ))}
                   </td>
                   <td className="py-2 text-xs">
                     {!c.actif ? (
@@ -207,6 +250,52 @@ export default function PageAdministration() {
             </tbody>
           </table>
         </div>
+      </Bloc>
+
+      <Bloc titre={`Unités terrain${unites ? ` (${unites.length})` : ""}`}>
+        <form onSubmit={creerUnite} className="mb-3 grid gap-3 sm:grid-cols-[1fr_14rem_auto] sm:items-end">
+          <Champ libelle="Nom de l'unité">
+            <input name="nom" required minLength={2} maxLength={60} placeholder="Patrouille Cocody 1" className={CHAMP} />
+          </Champ>
+          <Champ libelle="Type">
+            <select name="type" defaultValue={TYPES_UNITE[0]} className={CHAMP}>
+              {TYPES_UNITE.map((t) => (
+                <option key={t} value={t}>
+                  {LIBELLES_TYPE_UNITE[t]}
+                </option>
+              ))}
+            </select>
+          </Champ>
+          <button disabled={envoi} className={BOUTON}>
+            Ajouter
+          </button>
+        </form>
+        <p className="mb-2 text-xs text-attenue">Les intervenants rattachés à une unité reçoivent ses missions sur l'application mobile APSIG.</p>
+        <ul className="grid gap-1 text-sm">
+          {unites?.map((u) => (
+            <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-ligne py-2">
+              <span className="font-semibold">{u.nom}</span>
+              <span className="text-xs text-attenue">{u.libelleType}</span>
+              <span className="text-xs text-attenue">
+                {u.agents.filter((a) => a.actif).map((a) => a.nom).join(", ") || "Aucun intervenant"}
+              </span>
+              <select
+                value={u.statut}
+                disabled={envoi || u.statut === "EN_MISSION"}
+                onChange={(e) => void modifierUnite(u, { statut: e.target.value as StatutUnite })}
+                className="ml-auto rounded border border-ligne bg-white px-2 py-1 text-xs"
+                aria-label={`Statut de ${u.nom}`}
+              >
+                {(Object.keys(LIBELLES_STATUT_UNITE) as StatutUnite[]).map((s) => (
+                  <option key={s} value={s} disabled={s === "EN_MISSION" && u.statut !== "EN_MISSION"}>
+                    {LIBELLES_STATUT_UNITE[s]}
+                  </option>
+                ))}
+              </select>
+            </li>
+          ))}
+        </ul>
+        {unites?.length === 0 && <p className="text-sm text-attenue">Aucune unité.</p>}
       </Bloc>
 
       <JournalAudit />

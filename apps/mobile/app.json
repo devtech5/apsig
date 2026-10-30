@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "APSIG",
+    "slug": "apsig",
+    "scheme": "apsig",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "ci.apsig.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "APSIG envoie votre position aux secours pendant une alerte, pour qu'ils vous trouvent vite.",
+        "NSCameraUsageDescription": "La caméra sert à scanner les QR codes APSIG."
+      }
+    },
+    "android": {
+      "package": "ci.apsig.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1e3a6e",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "CAMERA", "VIBRATE"],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "APSIG envoie votre position aux secours pendant une alerte, pour qu'ils vous trouvent vite." }
+      ],
+      ["expo-camera", { "cameraPermission": "La caméra sert à scanner les QR codes APSIG.", "recordAudioAndroid": false }],
+      ["expo-notifications", { "color": "#c81e1e" }]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -6,7 +6,7 @@ import { estFixe, type TypeSupport } from "./supports.ts";
 
 export const STATUTS_RAPPEL = ["EN_ATTENTE", "CONFIRME", "EN_SECURITE", "INJOIGNABLE", "FAUSSE_ALERTE"] as const;
 export type StatutRappel = (typeof STATUTS_RAPPEL)[number];
-export type SourceAlerte = "QR" | "USSD" | "SMS" | "CENTRALE";
+export type SourceAlerte = "QR" | "USSD" | "SMS" | "CENTRALE" | "APPLI";
 
 export type ContexteFiabilite = {
   support: TypeSupport;
@@ -59,6 +59,7 @@ export function calculerFiabilite(c: ContexteFiabilite): Fiabilite {
   }
 
   if (c.source === "USSD" || c.source === "SMS") ajouter(10, "Numéro de téléphone identifié par le réseau");
+  if (c.source === "APPLI") ajouter(15, "Déclenchée depuis l'application par un abonné identifié");
 
   if (c.appareilBloque) ajouter(-50, "Appareil bloqué par un superviseur");
   const autres = c.alertesAppareilAutresSupports24h ?? 0;

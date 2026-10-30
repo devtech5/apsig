@@ -1,8 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { createHash, randomInt } from "node:crypto";
 import type { Prisma } from "@apsig/db";
 import {
+  ACTIVATION,
   ajouterMois,
   codeSupport,
+  estImprime,
   etatAbonnement,
   genererJeton,
   SUPPORTS,
@@ -21,7 +24,7 @@ const PREMIER_CODE_COURT = 30_000;
 
 const inclusFoyer = {
   quartier: { include: { ville: true, commune: true } },
-  membres: true,
+  membres: { include: { acces: { where: { revoqueLe: null }, orderBy: { creeLe: "desc" } } } },
   contacts: { orderBy: { ordre: "asc" } },
   supports: { orderBy: { creeLe: "asc" }, include: { membre: true, pose: true } },
   abonnements: { orderBy: { debut: "desc" }, include: { formule: true } },
@@ -46,6 +49,8 @@ export type Souscription = {
   essai?: boolean | undefined;
   paiement?: { montantFcfa: number; operateur: MoyenPaiement; telephone?: string | undefined; reference?: string | undefined } | undefined;
 };
+
+export const empreinte = (secret: string) => createHash("sha256").update(secret).digest("hex");
 
 const ORDRE_ROLE: Record<RoleMembre, number> = { TITULAIRE: 0, CONJOINT: 1, PARENT: 2, ENFANT: 3, AUTRE: 4 };
 
@@ -203,6 +208,8 @@ export class AbonnementsService {
       const m = await tx.membre.findUnique({ where: { id } });
       if (!m) throw new NotFoundException("Membre introuvable");
       if (m.role === "TITULAIRE") throw new ConflictException("Le titulaire ne peut pas être supprimé");
+      // Son application ne déclenche plus rien ; ses bracelets et cartes restent au foyer, sans porteur.
+      await tx.support.updateMany({ where: { membreId: id, type: "APPLI" }, data: { statut: "SUSPENDU" } });
       await tx.support.updateMany({ where: { membreId: id }, data: { membreId: null } });
       await tx.membre.delete({ where: { id } });
       await this.auditer(tx, u, "membre.supprimer", m.foyerId, { membreId: id });
@@ -358,6 +365,44 @@ export class AbonnementsService {
     return this.detail(foyerId);
   }
 
+  // ─── Application mobile des abonnés ────────────────────────────────────────
+
+  // Code à usage unique, affiché une fois au conseiller qui le remet au membre (plus tard, envoyé par SMS).
+  async codeActivation(membreId: string, u: UtilisateurConnecte) {
+    return this.db.$transaction(async (tx) => {
+      const m = await tx.membre.findUnique({ where: { id: membreId } });
+      if (!m) throw new NotFoundException("Membre introuvable");
+      if (!m.telephone) throw new ConflictException("Renseignez d'abord le téléphone du membre : il le saisira dans l'application");
+      const maintenant = new Date();
+      await tx.codeActivation.updateMany({ where: { membreId, utiliseLe: null, expireLe: { gt: maintenant } }, data: { expireLe: maintenant } });
+      const code = String(randomInt(10 ** ACTIVATION.chiffres)).padStart(ACTIVATION.chiffres, "0");
+      const expireLe = new Date(maintenant.getTime() + ACTIVATION.dureeH * 3_600_000);
+      await tx.codeActivation.create({ data: { membreId, codeHash: empreinte(code), expireLe } });
+      await this.auditer(tx, u, "membre.code_application", m.foyerId, { membreId });
+      return { code, expireLe, telephone: m.telephone };
+    });
+  }
+
+  // Téléphone perdu ou changé : l'application est déconnectée et ne reçoit plus les notifications.
+  async revoquerAcces(accesId: string, u: UtilisateurConnecte) {
+    const foyerId = await this.db.$transaction(async (tx) => {
+      const a = await tx.accesClient.findUnique({ where: { id: accesId }, include: { membre: true } });
+      if (!a) throw new NotFoundException("Application introuvable");
+      if (!a.revoqueLe) await tx.accesClient.update({ where: { id: accesId }, data: { revoqueLe: new Date(), jetonPush: null } });
+      await this.auditer(tx, u, "membre.deconnecter_application", a.membre.foyerId, { membreId: a.membreId, accesId });
+      return a.membre.foyerId;
+    });
+    return this.detail(foyerId);
+  }
+
+  // Le téléphone de l'abonné est un support à part entière (APP-0053-01) : l'alerte suit le même circuit qu'un QR.
+  async supportApplication(tx: Tx, membreId: string) {
+    const existant = await tx.support.findFirst({ where: { membreId, type: "APPLI" }, orderBy: { creeLe: "asc" } });
+    if (existant) return existant.statut === "ACTIF" ? existant : tx.support.update({ where: { id: existant.id }, data: { statut: "ACTIF" } });
+    const m = await tx.membre.findUniqueOrThrow({ where: { id: membreId } });
+    return this.creerSupport(tx, await this.charger(tx, m.foyerId), "APPLI", membreId);
+  }
+
   // ─── Interne ───────────────────────────────────────────────────────────────
 
   private async charger(db: Tx | PrismaService, id: string): Promise<FoyerComplet> {
@@ -480,9 +525,10 @@ export class AbonnementsService {
           anneeNaissance: m.anneeNaissance,
           // Saisies ici, lues seulement par la centrale pendant une alerte.
           infosMedicalesRenseignees: !!m.infosMedicales,
+          applications: m.acces.map((a) => ({ id: a.id, appareil: a.appareil, creeLe: a.creeLe, vuLe: a.vuLe })),
         })),
       contacts: f.contacts.map((c) => ({ id: c.id, nom: c.nom, relation: c.relation, telephone: c.telephone, ordre: c.ordre, consentiLe: c.consentiLe })),
-      supports: f.supports.map((s) => ({
+      supports: f.supports.filter((s) => estImprime(s.type)).map((s) => ({
         id: s.id,
         type: s.type,
         libelle: SUPPORTS[s.type].libelle,

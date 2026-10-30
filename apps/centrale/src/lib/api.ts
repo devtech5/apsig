@@ -93,9 +93,30 @@ export type AlerteDetail = AlerteResume & {
   }[];
   journal: { le: string; nature: string; texte: string; auteur: string | null }[];
   messages: { canal: string; destinataire: string; nomDestinataire: string | null; texte: string; statut: string; creeLe: string }[];
+  unite: {
+    id: string;
+    nom: string;
+    type: string;
+    statut: "DISPONIBLE" | "EN_MISSION" | "HORS_SERVICE";
+    position: (Position & { le: string | null }) | null;
+    engageeLe: string | null;
+    termineeLe: string | null;
+  } | null;
   peutAgir: boolean;
   peutPrendre: boolean;
   statutsPossibles: StatutAlerte[];
+};
+
+export type UniteCentrale = {
+  id: string;
+  nom: string;
+  type: string;
+  libelleType: string;
+  statut: "DISPONIBLE" | "EN_MISSION" | "HORS_SERVICE";
+  partenaire: string | null;
+  agents: string[];
+  missions: string[];
+  position: (Position & { le: string | null; recente: boolean }) | null;
 };
 
 export class ErreurApi extends Error {

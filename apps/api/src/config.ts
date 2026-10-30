@@ -21,4 +21,6 @@ export const config = {
   authSecret: process.env.BETTER_AUTH_SECRET,
   // Double authentification (application TOTP) exigée pour tout le back-office, sauf CENTRALE_2FA=facultatif.
   deuxFacteursObligatoire: process.env.CENTRALE_2FA !== "facultatif",
+  // Notifications de l'application mobile, envoyées par le service Expo ; EXPO_PUSH=inactif les garde en file.
+  push: { actif: process.env.EXPO_PUSH !== "inactif", jetonAcces: process.env.EXPO_ACCESS_TOKEN },
 };

@@ -56,3 +56,13 @@ export function ajouterMois(d: Date, mois: number): Date {
   r.setUTCDate(Math.min(jour, dernier));
   return r;
 }
+
+// ─── Application mobile des abonnés ──────────────────────────────────────────
+
+// Le conseiller remet un code à usage unique qui relie l'application au membre du foyer.
+export const ACTIVATION = { chiffres: 8, dureeH: 72, essais: 5 } as const;
+
+// Numéro ivoirien à 10 chiffres, quelle que soit la saisie (« +225 07 08 … », « 00225… », « 07.08… »).
+export function normaliserTelephone(saisie: string): string {
+  return saisie.replace(/\D/g, "").replace(/^(00)?225(?=\d{10}$)/, "");
+}

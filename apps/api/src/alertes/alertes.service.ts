@@ -27,10 +27,13 @@ import {
   type TypeUrgence,
 } from "@apsig/domain";
 import { FluxService } from "../flux/flux.module.ts";
+import { NotificationsService } from "../notifications/notifications.service.ts";
 import { PrismaService, type Tx } from "../prisma/prisma.service.ts";
 import { RepartitionService } from "../repartition/repartition.service.ts";
 
 export type PositionTemoin = { lat: number; lng: number; precisionM?: number | undefined };
+// Abonné qui déclenche depuis l'application : la centrale sait qui rappeler.
+export type DeclencheurAppli = { membreId: string; nom: string; telephone: string | null };
 
 const JOUR_MS = 86_400_000;
 // Le témoin est suivi en continu : seul un vrai déplacement est inscrit au fil de l'alerte.
@@ -45,7 +48,7 @@ const inclusSupport = {
   foyer: {
     include: {
       quartier: { include: { ville: true } },
-      membres: true,
+      membres: { include: { acces: { select: { jetonPush: true, revoqueLe: true } } } },
       contacts: { orderBy: { ordre: "asc" } },
       abonnements: { include: { formule: true } },
     },
@@ -73,6 +76,7 @@ export class AlertesService {
     private readonly db: PrismaService,
     private readonly repartition: RepartitionService,
     private readonly flux: FluxService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ─── Page d'alerte : ce que voit le témoin après le scan ──────────────────
@@ -95,6 +99,7 @@ export class AlertesService {
   async creer(
     input: { jeton: string; type: TypeUrgence; appareilId?: string | undefined; position?: PositionTemoin | undefined; problemePosition?: ProblemePosition | undefined },
     source: SourceAlerte = "QR",
+    declencheur?: DeclencheurAppli,
   ) {
     const resultat = await this.db.$transaction(async (tx) => {
       const support = await this.chargerSupport(tx, input.jeton);
@@ -151,6 +156,7 @@ export class AlertesService {
           lat: reference?.lat ?? null,
           lng: reference?.lng ?? null,
           appareilId: input.appareilId ?? null,
+          temoinTelephone: declencheur?.telephone ?? null,
           temoinLat: input.position?.lat ?? null,
           temoinLng: input.position?.lng ?? null,
           temoinPrecisionM: input.position?.precisionM ?? null,
@@ -164,7 +170,14 @@ export class AlertesService {
       });
 
       const urgence = URGENCES[input.type].bouton;
-      await this.evenement(tx, alerte.id, "temoin", `Alerte « ${urgence} » déclenchée par scan QR — ${SUPPORTS[support.type].libelle} ${support.code}`);
+      await this.evenement(
+        tx,
+        alerte.id,
+        "temoin",
+        declencheur
+          ? `Alerte « ${urgence} » déclenchée depuis l'application par ${declencheur.nom}${declencheur.telephone ? ` (${declencheur.telephone})` : ""}`
+          : `Alerte « ${urgence} » déclenchée par scan QR — ${SUPPORTS[support.type].libelle} ${support.code}`,
+      );
       if (fixe && foyer) {
         await this.evenement(tx, alerte.id, "systeme", `Adresse identifiée : ${support.code} — ${foyer.quartier.nom}, ${foyer.quartier.ville.nom}${foyer.adresseVerifiee ? " (vérifiée)" : ""}`);
       } else if (!fixe) {
@@ -176,8 +189,9 @@ export class AlertesService {
 
       // Les secours sont prévenus une fois par incident ; la famille de chaque support, toujours.
       const messages = this.messages(support, alerte, await this.partenaires(tx, input.type, intervention, foyer?.quartier.ville.code), !!incident);
-      if (messages.length) await tx.message.createMany({ data: messages });
-      await this.evenement(tx, alerte.id, "systeme", `Routage : ${messages.length} message(s) en file d'envoi`);
+      const notifications = foyer ? this.notifications.messagesFoyer(foyer.membres, alerte.id, this.texteFamille(support, alerte, declencheur), declencheur?.membreId) : [];
+      if (messages.length + notifications.length) await tx.message.createMany({ data: [...messages, ...notifications] });
+      await this.evenement(tx, alerte.id, "systeme", `Routage : ${messages.length} message(s) en file d'envoi${notifications.length ? `, ${notifications.length} notification(s) à l'application du foyer` : ""}`);
 
       if (incident) {
         const distance = formatDistance(incident.distanceM);
@@ -190,6 +204,7 @@ export class AlertesService {
       return { alerte: await this.rafraichirFiabilite(tx, alerte.id), doublon: false };
     });
     this.flux.emettre({ type: "alertes" });
+    if (!resultat.doublon) void this.notifications.envoyerEnFile(resultat.alerte.id);
     return resultat;
   }
 
@@ -340,6 +355,17 @@ export class AlertesService {
       where: { actif: true, type: { in: types as TypePartenaire[] }, OR: [{ villeCode: null }, { villeCode: villeCode ?? null }] },
     });
     return { types: destinatairesPour(type, { intervention }), liste };
+  }
+
+  // Notification aux téléphones du foyer : qui est concerné et où, sans détail médical.
+  private texteFamille(support: SupportComplet, alerte: Alerte, declencheur?: DeclencheurAppli) {
+    const porteur = support.foyer?.membres.find((m) => m.id === support.membreId);
+    const ou = declencheur
+      ? `${declencheur.nom} a déclenché une alerte depuis l'application`
+      : estFixe(support.type)
+        ? `Alerte sur le QR ${support.code} de votre domicile`
+        : `Alerte : ${SUPPORTS[support.type].libelle} ${porteur ? `de ${porteur.prenom}` : support.code}`;
+    return `${ou} à ${heure(alerte.creeLe)}. La centrale APSIG est mobilisée.`;
   }
 
   private messages(

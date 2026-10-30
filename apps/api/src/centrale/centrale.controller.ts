@@ -15,6 +15,7 @@ const rappel = z.object({ rappel: z.enum(STATUTS_RAPPEL) });
 const note = z.object({ texte: z.string().trim().min(1).max(1000) });
 const reattribution = z.object({ operateurId: z.string().min(1).optional() });
 const presence = z.object({ presence: z.enum(["EN_SERVICE", "PAUSE", "HORS_SERVICE"]) });
+const engagement = z.object({ uniteId: z.string().min(1).nullable() });
 
 // Routes de la centrale, réservées aux opérateurs connectés (cookie de session Better Auth).
 @Controller("centrale")
@@ -89,6 +90,17 @@ export class CentraleController {
   @HttpCode(200)
   detacher(@Param("numero") numero: string, @Utilisateur() u: UtilisateurConnecte) {
     return this.centrale.detacher(numero, u);
+  }
+
+  @Get("unites")
+  unites() {
+    return this.centrale.unites();
+  }
+
+  @Post("alertes/:numero/unite")
+  @HttpCode(200)
+  engagerUnite(@Param("numero") numero: string, @Body(new ZodPipe(engagement)) body: z.infer<typeof engagement>, @Utilisateur() u: UtilisateurConnecte) {
+    return this.centrale.engagerUnite(numero, body.uniteId, u);
   }
 
   @Post("presence")

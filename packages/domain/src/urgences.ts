@@ -63,6 +63,7 @@ export const MENUS: Record<TypeSupport, TypeUrgence[]> = {
   BRACELET: ["EGARE", "MEDICAL", "AUTRE"],
   CARTE_VOYAGEUR: ["MEDICAL", "AGRESSION", "EGARE", "AUTRE"],
   CARTE_VEHICULE: ["MEDICAL", "AGRESSION", "AUTRE"],
+  APPLI: ["AGRESSION", "MEDICAL", "INCENDIE", "EGARE", "SOINS", "AUTRE"],
 };
 
 // Formule « Sécurité + » : l'équipe d'intervention APSIG est engagée en premier sur une agression.

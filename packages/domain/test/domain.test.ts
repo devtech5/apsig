@@ -50,6 +50,8 @@ describe("Supports", () => {
     expect(codeSupport("BRACELET", { numero: 453, rang: 1 })).toBe("ENF-0453-01");
     expect(codeSupport("CARTE_VOYAGEUR", { numero: 453 })).toBe("VOY-0453");
     expect(codeSupport("INTERIEUR", { numero: 453 })).toBe("INT-0453");
+    // Téléphone d'un membre relié à l'application : un par membre, numéroté comme les bracelets.
+    expect(codeSupport("APPLI", { numero: 453, rang: 3 })).toBe("APP-0453-03");
   });
 
   it("distingue plusieurs supports du même type dans un foyer", () => {

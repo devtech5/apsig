@@ -6,7 +6,9 @@ import {
   estOuverte,
   LIBELLES_RAPPEL,
   LIBELLES_STATUT,
+  LIBELLES_TYPE_UNITE,
   niveauEscaladeDu,
+  POSITION_UNITE_RECENTE_MS,
   peutPasser,
   REPARTITION,
   scoreTriage,
@@ -20,6 +22,7 @@ import {
 import { AlertesService } from "../alertes/alertes.service.ts";
 import type { UtilisateurConnecte } from "../auth/auth.module.ts";
 import { FluxService } from "../flux/flux.module.ts";
+import { NotificationsService } from "../notifications/notifications.service.ts";
 import { PrismaService, type Tx } from "../prisma/prisma.service.ts";
 import { RepartitionService } from "../repartition/repartition.service.ts";
 
@@ -28,6 +31,15 @@ const OUVERTS = [...STATUTS_OUVERTS];
 // La file ne montre que les alertes principales : les témoins rattachés suivent leur incident.
 const principalesOuvertes = { statut: { in: OUVERTS }, principaleId: null } satisfies Prisma.AlerteWhereInput;
 const TAILLE_FILE_COMMUNE = 50;
+
+// Avancement annoncé aux téléphones du foyer reliés à l'application.
+const SUIVI_FOYER: Partial<Record<StatutAlerte, (issue?: string) => string>> = {
+  PRISE_EN_CHARGE: () => "Un opérateur APSIG traite l'alerte et va vous rappeler.",
+  EN_ROUTE: () => "Les secours sont en route.",
+  SUR_PLACE: () => "Les secours sont sur place.",
+  CLOTUREE: (issue) => `Alerte close : ${issue}.`,
+  ANNULEE: (issue) => `Alerte annulée par la centrale : ${issue}.`,
+};
 
 const inclusFile = {
   support: { select: { type: true, code: true } },
@@ -53,6 +65,7 @@ const inclusDetail = {
   rattachees: { include: { support: { select: { type: true, code: true } } }, orderBy: { creeLe: "asc" } },
   evenements: { include: { auteur: { select: { nom: true } } }, orderBy: { le: "asc" } },
   messages: { orderBy: { creeLe: "asc" } },
+  unite: true,
 } satisfies Prisma.AlerteInclude;
 
 type AvecPrincipale = Alerte & { principale: { numero: string; attribueeAId: string | null } | null };
@@ -67,6 +80,7 @@ export class CentraleService {
     private readonly alertes: AlertesService,
     private readonly repartition: RepartitionService,
     private readonly flux: FluxService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // La centrale relit sa file en continu : c'est aussi le signe de vie de l'opérateur.
@@ -149,6 +163,15 @@ export class CentraleService {
       })),
       journal: a.evenements.map((e) => ({ le: e.le, nature: e.nature, texte: e.texte, auteur: e.auteur?.nom ?? null })),
       messages: a.messages.map(({ canal, destinataire, nomDestinataire, texte, statut, creeLe }) => ({ canal, destinataire, nomDestinataire, texte, statut, creeLe })),
+      unite: a.unite && {
+        id: a.unite.id,
+        nom: a.unite.nom,
+        type: a.unite.type,
+        statut: a.unite.statut,
+        position: a.unite.lat != null && a.unite.lng != null ? { lat: a.unite.lat, lng: a.unite.lng, le: a.unite.gpsLe } : null,
+        engageeLe: a.uniteEngageeLe,
+        termineeLe: a.missionTermineeLe,
+      },
       peutAgir: agir,
       // Accepter : l'alerte n'est pas encore acceptée, ou elle l'est par quelqu'un d'autre et c'est un superviseur qui regarde.
       peutPrendre: agir && principale && estOuverte(a.statut) && !(a.accepteeLe && a.attribueeAId),
@@ -193,7 +216,7 @@ export class CentraleService {
   }
 
   async changerStatut(numero: string, vers: StatutAlerte, issue: string | undefined, u: UtilisateurConnecte) {
-    await this.db.$transaction(async (tx) => {
+    const id = await this.db.$transaction(async (tx) => {
       const a = await this.charger(tx, numero, u);
       this.verifierPrincipale(a);
       if (!peutPasser(a.statut, vers)) {
@@ -213,8 +236,82 @@ export class CentraleService {
       await this.evenement(tx, a.id, `${LIBELLES_STATUT[vers]}${issue ? ` — ${issue}` : ""}`, u);
       await this.audit(tx, "alerte.statut", numero, u, { de: a.statut, vers, issue });
       if (finale) await this.cloreRattachees(tx, a, vers, issue!, u, maintenant);
+      const suivi = SUIVI_FOYER[vers];
+      if (suivi) await this.notifications.suiviFoyer(tx, a.id, suivi(issue));
+      return a.id;
     });
     this.flux.emettre({ type: "alertes", numero });
+    void this.notifications.envoyerEnFile(id);
+    return this.detail(numero, u);
+  }
+
+  // Unités terrain, pour les engager et les voir sur la carte.
+  async unites() {
+    const recente = new Date(Date.now() - POSITION_UNITE_RECENTE_MS);
+    const unites = await this.db.unite.findMany({
+      include: {
+        partenaire: { select: { nom: true } },
+        agents: { where: { actif: true }, select: { nom: true }, orderBy: { nom: "asc" } },
+        alertes: { where: { statut: { in: OUVERTS }, missionTermineeLe: null }, select: { numero: true } },
+      },
+      orderBy: { nom: "asc" },
+    });
+    return unites.map((x) => ({
+      id: x.id,
+      nom: x.nom,
+      type: x.type,
+      libelleType: LIBELLES_TYPE_UNITE[x.type],
+      statut: x.statut,
+      partenaire: x.partenaire?.nom ?? null,
+      agents: x.agents.map((a) => a.nom),
+      missions: x.alertes.map((a) => a.numero),
+      position: x.lat != null && x.lng != null ? { lat: x.lat, lng: x.lng, le: x.gpsLe, recente: !!x.gpsLe && x.gpsLe >= recente } : null,
+    }));
+  }
+
+  // Engage (ou retire, uniteId null) une unité terrain : ses agents reçoivent la mission sur l'application.
+  async engagerUnite(numero: string, uniteId: string | null, u: UtilisateurConnecte) {
+    const id = await this.db.$transaction(async (tx) => {
+      const a = await this.charger(tx, numero, u);
+      this.verifierPrincipale(a);
+      if (a.uniteId === uniteId) return a.id;
+      if (a.uniteId && !a.missionTermineeLe) {
+        const encore = await tx.alerte.count({ where: { uniteId: a.uniteId, id: { not: a.id }, statut: { in: OUVERTS }, missionTermineeLe: null } });
+        if (!encore) await tx.unite.update({ where: { id: a.uniteId }, data: { statut: "DISPONIBLE" } });
+      }
+      if (!uniteId) {
+        await tx.alerte.update({ where: { id: a.id }, data: { uniteId: null, uniteEngageeLe: null, missionTermineeLe: null } });
+        await this.evenement(tx, a.id, "Unité terrain retirée de l'alerte", u);
+        await this.audit(tx, "alerte.unite", numero, u, { uniteId: null });
+        return a.id;
+      }
+      const unite = await tx.unite.findUnique({
+        where: { id: uniteId },
+        include: { agents: { where: { actif: true, jetonPush: { not: null } }, select: { nom: true, jetonPush: true } } },
+      });
+      if (!unite) throw new NotFoundException("Unité introuvable");
+      if (unite.statut === "HORS_SERVICE") throw new ConflictException(`${unite.nom} est hors service`);
+      await tx.alerte.update({ where: { id: a.id }, data: { uniteId, uniteEngageeLe: new Date(), missionTermineeLe: null } });
+      await tx.unite.update({ where: { id: uniteId }, data: { statut: "EN_MISSION" } });
+      await this.evenement(tx, a.id, `Unité ${unite.nom} engagée`, u);
+      await this.audit(tx, "alerte.unite", numero, u, { uniteId });
+      if (unite.agents.length) {
+        await tx.message.createMany({
+          data: unite.agents.map((ag) => ({
+            alerteId: a.id,
+            canal: "PUSH" as const,
+            pilote: "expo",
+            destinataire: ag.jetonPush!,
+            nomDestinataire: `Unité ${unite.nom} — ${ag.nom}`,
+            texte: "Nouvelle mission : ouvrez l'application pour l'adresse et l'itinéraire.",
+          })),
+        });
+      }
+      return a.id;
+    });
+    this.flux.emettre({ type: "alertes", numero });
+    this.flux.emettre({ type: "unites" });
+    void this.notifications.envoyerEnFile(id);
     return this.detail(numero, u);
   }
 

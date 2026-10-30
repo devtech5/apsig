@@ -96,8 +96,39 @@ model Membre {
   // Données de santé : visibles par la centrale uniquement, jamais sur la page publique.
   infosMedicales   String?
   supports         Support[]
+  acces            AccesClient[]
+  codesActivation  CodeActivation[]
 
   @@index([foyerId])
+}
+
+// Téléphone d'un membre relié à l'application APSIG (espace abonné).
+model AccesClient {
+  id         String    @id @default(cuid())
+  membreId   String
+  membre     Membre    @relation(fields: [membreId], references: [id], onDelete: Cascade)
+  jetonHash  String    @unique // empreinte SHA-256 du jeton gardé par l'application, jamais le jeton lui-même
+  appareil   String? // « Samsung A14 », pour reconnaître le téléphone dans le back-office
+  jetonPush  String? // jeton Expo des notifications
+  creeLe     DateTime  @default(now())
+  vuLe       DateTime?
+  revoqueLe  DateTime?
+
+  @@index([membreId])
+}
+
+// Code à usage unique remis par le conseiller (plus tard par SMS) pour relier l'application au membre.
+model CodeActivation {
+  id         String    @id @default(cuid())
+  membreId   String
+  membre     Membre    @relation(fields: [membreId], references: [id], onDelete: Cascade)
+  codeHash   String
+  expireLe   DateTime
+  essais     Int       @default(0)
+  utiliseLe  DateTime?
+  creeLe     DateTime  @default(now())
+
+  @@index([membreId])
 }
 
 model ContactUrgence {
@@ -121,6 +152,7 @@ enum TypeSupport {
   BRACELET // bracelet enfant
   CARTE_VOYAGEUR
   CARTE_VEHICULE
+  APPLI // téléphone d'un abonné relié à l'application : pas de QR imprimé
 }
 
 enum StatutSupport {
@@ -309,6 +341,7 @@ model Unite {
 // SUPERADMIN (propriétaire : administrateurs, audit complet).
 enum RoleUtilisateur {
   AGENT
+  INTERVENANT // membre d'une unité terrain (application mobile)
   CONSEILLER
   OPERATEUR
   SUPERVISEUR
@@ -338,6 +371,7 @@ model Utilisateur {
   deuxFacteurs Boolean       @default(false) // twoFactorEnabled de Better Auth
   presence   Presence        @default(HORS_SERVICE)
   presenceLe DateTime?
+  jetonPush  String? // jeton Expo des notifications de l'application mobile (missions des unités)
   vuLe       DateTime? // dernier signe de vie de la centrale ouverte
   derniereAttributionLe DateTime? // départage les opérateurs à charge égale
   creeLe     DateTime        @default(now())
@@ -444,6 +478,7 @@ enum SourceAlerte {
   USSD
   SMS
   CENTRALE
+  APPLI // application APSIG d'un abonné identifié
 }
 
 enum StatutRappel {
@@ -504,8 +539,10 @@ model Alerte {
   principaleId    String?
   principale      Alerte?       @relation("Regroupement", fields: [principaleId], references: [id])
   rattachees      Alerte[]      @relation("Regroupement")
-  uniteId         String?
+  uniteId         String? // unité terrain engagée par la centrale
   unite           Unite?        @relation(fields: [uniteId], references: [id])
+  uniteEngageeLe  DateTime?
+  missionTermineeLe DateTime? // l'unité a fini sur place ; la centrale clôture
   issue           String?
   creeLe          DateTime      @default(now())
   priseEnChargeLe DateTime?

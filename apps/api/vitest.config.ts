@@ -14,7 +14,7 @@ export default defineConfig({
   test: {
     globalSetup: ["test/global-setup.ts"],
     // La double authentification n'est exigée que dans les tests qui la vérifient.
-    env: { DATABASE_URL: testDatabaseUrl, RATE_LIMIT_ALERTES: "1000", CENTRALE_2FA: "facultatif" },
+    env: { DATABASE_URL: testDatabaseUrl, RATE_LIMIT_ALERTES: "1000", CENTRALE_2FA: "facultatif", EXPO_PUSH: "inactif" },
     fileParallelism: false,
     testTimeout: 20_000,
     hookTimeout: 60_000,

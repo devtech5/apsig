@@ -98,6 +98,16 @@ export class AbonnementsController {
     return this.abonnements.supprimerMembre(id, u);
   }
 
+  @Post("membres/:id/code-application")
+  codeApplication(@Param("id") id: string, @Utilisateur() u: UtilisateurConnecte) {
+    return this.abonnements.codeActivation(id, u);
+  }
+
+  @Delete("applications/:id")
+  deconnecterApplication(@Param("id") id: string, @Utilisateur() u: UtilisateurConnecte) {
+    return this.abonnements.revoquerAcces(id, u);
+  }
+
   @Post("foyers/:id/contacts")
   ajouterContact(@Param("id") id: string, @Body(new ZodPipe(contact)) body: z.infer<typeof contact>, @Utilisateur() u: UtilisateurConnecte) {
     return this.abonnements.ajouterContact(id, body, u);

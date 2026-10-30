@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ajouterMois, etatAbonnement } from "../src/index.ts";
+import { ajouterMois, etatAbonnement, normaliserTelephone } from "../src/index.ts";
 
 describe("Abonnements", () => {
   it("ajoute des mois sans déborder sur le mois suivant", () => {
@@ -17,5 +17,14 @@ describe("Abonnements", () => {
     expect(etatAbonnement(a("ACTIF", "2026-11-01", "2026-12-01"), maintenant)).toBe("A_VENIR");
     expect(etatAbonnement(a("ESSAI", "2026-10-25", "2026-11-25"), maintenant)).toBe("ESSAI");
     expect(etatAbonnement(a("RESILIE", "2026-10-01", "2026-11-01"), maintenant)).toBe("RESILIE");
+  });
+});
+
+describe("normaliserTelephone", () => {
+  it("ramène toutes les saisies au numéro à 10 chiffres", () => {
+    expect(normaliserTelephone("+225 07 08 09 10 11")).toBe("0708091011");
+    expect(normaliserTelephone("00225 0708091011")).toBe("0708091011");
+    expect(normaliserTelephone("07.08.09.10.11")).toBe("0708091011");
+    expect(normaliserTelephone("0708091011")).toBe("0708091011");
   });
 });
