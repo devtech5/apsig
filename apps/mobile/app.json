@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "APSIG",
-    "slug": "apsig",
+    "slug": "code-secours",
+    "owner": "apsig-team",
     "scheme": "apsig",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -42,6 +43,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": { "projectId": "3d45fedc-b8ee-468c-96b4-f63f0e0fd2f3" }
     }
   }
 }

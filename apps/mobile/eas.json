@@ -4,14 +4,19 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "node": "22.20.0",
+      "pnpm": "11.12.0",
+      "env": { "EXPO_PUBLIC_API_URL": "https://api.apsig.online" }
+    },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_API_URL": "https://api.example.ci" }
+      "android": { "buildType": "apk" }
     },
     "production": {
-      "autoIncrement": true,
-      "env": { "EXPO_PUBLIC_API_URL": "https://api.example.ci" }
+      "extends": "base",
+      "autoIncrement": true
     }
   },
   "submit": {
