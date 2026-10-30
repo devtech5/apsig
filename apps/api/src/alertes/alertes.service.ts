@@ -7,20 +7,26 @@ import {
   estFixe,
   estOuverte,
   FENETRE_DOUBLON_MS,
+  formatDistance,
   genererJeton,
   menuPour,
   numeroAlerte,
   STATUTS_OUVERTS,
   SUPPORTS,
+  INCIDENT,
   temoinPeutAnnuler,
   transition,
   trouverDoublon,
+  trouverIncident,
   URGENCES,
   type Destinataire,
   type SourceAlerte,
+  type StatutAlerte,
   type TypeUrgence,
 } from "@apsig/domain";
+import { FluxService } from "../flux/flux.module.ts";
 import { PrismaService, type Tx } from "../prisma/prisma.service.ts";
+import { RepartitionService } from "../repartition/repartition.service.ts";
 
 export type PositionTemoin = { lat: number; lng: number; precisionM?: number | undefined };
 
@@ -48,9 +54,18 @@ function memeCle(attendue: string, recue: string | undefined) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// Une alerte rattachée à un incident affiche au témoin l'avancement de l'incident.
+type Avancement = Pick<Alerte, "statut" | "priseEnChargeLe" | "surPlaceLe" | "clotureLe">;
+const avancement = (a: Alerte, principale?: Avancement | null): Avancement =>
+  principale && estOuverte(a.statut) ? principale : a;
+
 @Injectable()
 export class AlertesService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly repartition: RepartitionService,
+    private readonly flux: FluxService,
+  ) {}
 
   // ─── Page d'alerte : ce que voit le témoin après le scan ──────────────────
 
@@ -70,7 +85,7 @@ export class AlertesService {
   }
 
   async creer(input: { jeton: string; type: TypeUrgence; appareilId?: string | undefined; position?: PositionTemoin | undefined }, source: SourceAlerte = "QR") {
-    return this.db.$transaction(async (tx) => {
+    const resultat = await this.db.$transaction(async (tx) => {
       const support = await this.chargerSupport(tx, input.jeton);
       const maintenant = new Date();
 
@@ -104,8 +119,18 @@ export class AlertesService {
         ? foyer?.lat != null && foyer.lng != null ? { lat: foyer.lat, lng: foyer.lng } : null
         : input.position ?? null;
 
+      // Incendie ou agression voisine déjà signalée : même incident, traité par le même opérateur.
+      const incident = trouverIncident(
+        await tx.alerte.findMany({
+          where: { type: input.type, statut: { in: [...STATUTS_OUVERTS] }, principaleId: null, creeLe: { gte: new Date(maintenant.getTime() - INCIDENT.fenetreMs) } },
+        }),
+        { type: input.type, position: reference },
+        maintenant,
+      );
+
       const alerte = await tx.alerte.create({
         data: {
+          principaleId: incident?.id ?? null,
           numero: numeroAlerte(await this.prochainNumero(tx)),
           type: input.type,
           priorite: URGENCES[input.type].priorite,
@@ -135,20 +160,54 @@ export class AlertesService {
       if (!abonnement) await this.evenement(tx, alerte.id, "systeme", "Abonnement expiré ou absent : alerte traitée quand même (l'urgence prime)");
       if (intervention && input.type === "AGRESSION") await this.evenement(tx, alerte.id, "systeme", "Formule Sécurité + : équipe d'intervention APSIG à engager en priorité");
 
-      const messages = this.messages(support, alerte, await this.partenaires(tx, input.type, intervention, foyer?.quartier.ville.code));
+      // Les secours sont prévenus une fois par incident ; la famille de chaque support, toujours.
+      const messages = this.messages(support, alerte, await this.partenaires(tx, input.type, intervention, foyer?.quartier.ville.code), !!incident);
       if (messages.length) await tx.message.createMany({ data: messages });
       await this.evenement(tx, alerte.id, "systeme", `Routage : ${messages.length} message(s) en file d'envoi`);
 
+      if (incident) {
+        const distance = formatDistance(incident.distanceM);
+        await this.evenement(tx, alerte.id, "systeme", `Rattachée à l'incident ${incident.numero} (à ${distance})`);
+        await this.evenement(tx, incident.id, "temoin", `Témoin supplémentaire : ${alerte.numero}, ${SUPPORTS[support.type].libelle} ${support.code} (à ${distance})`);
+      } else {
+        await this.repartition.attribuer(tx, alerte.id, maintenant);
+      }
+
       return { alerte: await this.rafraichirFiabilite(tx, alerte.id), doublon: false };
     });
+    this.flux.emettre({ type: "alertes" });
+    return resultat;
   }
 
   async consulter(numero: string, cle: string | undefined) {
     return this.alerteDuTemoin(this.db, numero, cle);
   }
 
+  // Le témoin annule son alerte : si d'autres témoins sont rattachés, l'incident continue avec le premier d'entre eux.
+  private async promouvoirRattachee(tx: Tx, principale: Alerte) {
+    const [suivante, ...autres] = await tx.alerte.findMany({
+      where: { principaleId: principale.id, statut: { in: [...STATUTS_OUVERTS] } },
+      orderBy: { creeLe: "asc" },
+    });
+    if (!suivante) return;
+    await tx.alerte.update({
+      where: { id: suivante.id },
+      data: {
+        principaleId: null,
+        attribueeAId: principale.attribueeAId,
+        attribueeLe: principale.attribueeLe,
+        accepteeLe: principale.accepteeLe,
+        operateurId: principale.operateurId,
+        priseEnChargeLe: principale.priseEnChargeLe,
+        statut: principale.statut,
+      },
+    });
+    if (autres.length) await tx.alerte.updateMany({ where: { id: { in: autres.map((a) => a.id) } }, data: { principaleId: suivante.id } });
+    await this.evenement(tx, suivante.id, "systeme", `Devient l'alerte principale de l'incident (${principale.numero} annulée par son témoin)`);
+  }
+
   async partagerPosition(numero: string, cle: string, position: PositionTemoin) {
-    return this.db.$transaction(async (tx) => {
+    await this.db.$transaction(async (tx) => {
       const a = await this.alerteDuTemoin(tx, numero, cle);
       if (!estOuverte(a.statut)) throw new ConflictException("Alerte déjà clôturée");
       const support = await tx.support.findUniqueOrThrow({ where: { id: a.supportId } });
@@ -164,35 +223,41 @@ export class AlertesService {
       });
       const precision = position.precisionM != null ? ` (précision ${Math.round(position.precisionM)} m)` : "";
       await this.evenement(tx, a.id, "temoin", `Position du témoin reçue${precision}`);
-      return this.rafraichirFiabilite(tx, a.id);
+      await this.rafraichirFiabilite(tx, a.id);
     });
+    this.flux.emettre({ type: "alertes", numero });
+    return this.consulter(numero, cle);
   }
 
   async annuler(numero: string, cle: string) {
-    return this.db.$transaction(async (tx) => {
+    await this.db.$transaction(async (tx) => {
       const a = await this.alerteDuTemoin(tx, numero, cle);
-      if (!temoinPeutAnnuler(a.statut)) throw new ConflictException("Cette alerte ne peut plus être annulée");
+      if (!temoinPeutAnnuler(avancement(a, a.principale).statut)) throw new ConflictException("Cette alerte ne peut plus être annulée");
       await this.evenement(tx, a.id, "temoin", "Alerte annulée par le témoin");
-      return tx.alerte.update({
+      await tx.alerte.update({
         where: { id: a.id },
         data: { statut: transition(a.statut, "ANNULEE"), clotureLe: new Date(), issue: "Annulée par le témoin" },
       });
+      if (!a.principaleId) await this.promouvoirRattachee(tx, a);
     });
+    this.flux.emettre({ type: "alertes", numero });
+    return this.consulter(numero, cle);
   }
 
   // Ce que le témoin peut voir de son alerte (aucune donnée sur le foyer).
-  vuePublique(a: Alerte) {
+  vuePublique(a: Alerte & { principale?: Avancement | null }) {
+    const etat = avancement(a, a.principale);
     return {
       numero: a.numero,
       type: a.type,
       urgence: URGENCES[a.type].bouton,
-      statut: a.statut,
+      statut: etat.statut,
       creeLe: a.creeLe,
-      priseEnChargeLe: a.priseEnChargeLe,
-      surPlaceLe: a.surPlaceLe,
-      clotureLe: a.clotureLe,
+      priseEnChargeLe: etat.priseEnChargeLe,
+      surPlaceLe: etat.surPlaceLe,
+      clotureLe: etat.clotureLe,
       positionPartagee: a.temoinLat != null,
-      peutAnnuler: temoinPeutAnnuler(a.statut),
+      peutAnnuler: temoinPeutAnnuler(etat.statut as StatutAlerte),
     };
   }
 
@@ -213,7 +278,10 @@ export class AlertesService {
   }
 
   private async alerteDuTemoin(db: Tx | PrismaService, numero: string, cle: string | undefined) {
-    const a = await db.alerte.findUnique({ where: { numero } });
+    const a = await db.alerte.findUnique({
+      where: { numero },
+      include: { principale: { select: { statut: true, priseEnChargeLe: true, surPlaceLe: true, clotureLe: true } } },
+    });
     if (!a || !memeCle(a.cleTemoin, cle)) throw new ForbiddenException("Accès refusé");
     return a;
   }
@@ -243,6 +311,7 @@ export class AlertesService {
     support: SupportComplet,
     alerte: Alerte,
     p: Awaited<ReturnType<AlertesService["partenaires"]>>,
+    rattachee = false,
   ): Prisma.MessageCreateManyInput[] {
     const urgence = URGENCES[alerte.type].bouton;
     const foyer = support.foyer;
@@ -256,6 +325,7 @@ export class AlertesService {
 
     for (const d of p.types) {
       if (PARTENAIRES.has(d)) {
+        if (rattachee) continue;
         for (const part of p.liste.filter((x) => x.type === d)) {
           out.push({ ...base, destinataire: part.telephone, nomDestinataire: part.nom, texte: `[CODE-SECOURS] ${urgence} — ${lieu}.${gps} Réf ${alerte.numero}. Centrale APSIG.` });
         }
@@ -272,18 +342,24 @@ export class AlertesService {
     return out;
   }
 
-  private async rafraichirFiabilite(tx: Tx, alerteId: string) {
-    const a = await tx.alerte.findUniqueOrThrow({
+  async rafraichirFiabilite(tx: Tx, alerteId: string) {
+    const { score } = await this.evaluerFiabilite(tx, alerteId);
+    return tx.alerte.update({ where: { id: alerteId }, data: { scoreFiabilite: score } });
+  }
+
+  // Score et raisons détaillées, affichées à l'opérateur de la centrale.
+  async evaluerFiabilite(db: Tx | PrismaService, alerteId: string) {
+    const a = await db.alerte.findUniqueOrThrow({
       where: { id: alerteId },
       include: { support: { include: { foyer: true } }, appareil: true, _count: { select: { medias: true } } },
     });
     const foyer = a.support.foyer;
     const autres = a.appareilId
-      ? await tx.alerte.count({
+      ? await db.alerte.count({
           where: { appareilId: a.appareilId, id: { not: a.id }, supportId: { not: a.supportId }, creeLe: { gte: new Date(a.creeLe.getTime() - JOUR_MS) } },
         })
       : 0;
-    const { score } = calculerFiabilite({
+    return calculerFiabilite({
       support: a.support.type,
       source: a.source,
       adresse: foyer?.lat != null && foyer.lng != null ? { lat: foyer.lat, lng: foyer.lng } : null,
@@ -294,6 +370,5 @@ export class AlertesService {
       medias: a._count.medias,
       rappel: a.rappel,
     });
-    return tx.alerte.update({ where: { id: a.id }, data: { scoreFiabilite: score } });
   }
 }

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
+import { RepartitionModule } from "../repartition/repartition.module.ts";
 import { AlertesService } from "./alertes.service.ts";
 import { PublicController } from "./public.controller.ts";
 
-@Module({ controllers: [PublicController], providers: [AlertesService], exports: [AlertesService] })
+@Module({ imports: [RepartitionModule], controllers: [PublicController], providers: [AlertesService], exports: [AlertesService] })
 export class AlertesModule {}

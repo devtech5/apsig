@@ -31,3 +31,6 @@ Thumbs.db
 
 # Réglages Claude Code personnels
 .claude/settings.local.json
+
+# Worker de la carte, copié depuis maplibre-gl au lancement (apps/centrale/scripts/worker-carte.mjs)
+apps/centrale/public/maplibre-gl-worker.js

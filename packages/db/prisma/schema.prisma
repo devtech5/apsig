@@ -303,27 +303,113 @@ model Unite {
   alertes      Alerte[]
 }
 
+// Espaces du back-office : AGENT (pose, application terrain), CONSEILLER (foyers, abonnements, supports),
+// OPERATEUR (call center), SUPERVISEUR (équipe, répartition, statistiques), ADMIN (comptes, paramètres),
+// SUPERADMIN (propriétaire : administrateurs, audit complet).
 enum RoleUtilisateur {
   AGENT
+  CONSEILLER
   OPERATEUR
   SUPERVISEUR
   ADMIN
+  SUPERADMIN
 }
 
-// Les tables de session/compte de Better Auth seront ajoutées avec l'API.
+// Seuls les opérateurs « en service » et vus récemment reçoivent des alertes.
+enum Presence {
+  EN_SERVICE
+  PAUSE
+  HORS_SERVICE
+}
+
+// Utilisateur de Better Auth (cf. apps/api/src/auth/auth.ts pour la correspondance des champs).
+// Pas d'inscription publique : les comptes sont créés par la commande creer-compte de l'API.
 model Utilisateur {
   id         String          @id @default(cuid())
   nom        String
   email      String          @unique
+  emailVerifie Boolean       @default(false)
+  image      String?
   role       RoleUtilisateur
   uniteId    String?
   unite      Unite?          @relation(fields: [uniteId], references: [id])
   actif      Boolean         @default(true)
+  deuxFacteurs Boolean       @default(false) // twoFactorEnabled de Better Auth
+  presence   Presence        @default(HORS_SERVICE)
+  presenceLe DateTime?
+  vuLe       DateTime? // dernier signe de vie de la centrale ouverte
+  derniereAttributionLe DateTime? // départage les opérateurs à charge égale
   creeLe     DateTime        @default(now())
+  modifieLe  DateTime        @default(now()) @updatedAt
+  sessions   Session[]
+  comptes    Compte[]
+  secondsFacteurs SecondFacteur[]
   poses      Pose[]
   alertesTraitees Alerte[]   @relation("Operateur")
+  alertesAttribuees Alerte[] @relation("Attribution")
   evenements EvenementAlerte[]
   audit      Audit[]
+}
+
+// Tables internes de Better Auth : noms de champs imposés par la bibliothèque.
+model Session {
+  id        String      @id
+  token     String      @unique
+  userId    String
+  user      Utilisateur @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId])
+}
+
+// Identifiants de connexion (providerId « credential » : mot de passe haché).
+model Compte {
+  id                    String      @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  Utilisateur @relation(fields: [userId], references: [id], onDelete: Cascade)
+  password              String?
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([userId])
+}
+
+// Double authentification (application TOTP) : secret et codes de secours chiffrés par Better Auth.
+model SecondFacteur {
+  id                      String      @id
+  secret                  String
+  backupCodes             String
+  userId                  String
+  user                    Utilisateur @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified                Boolean     @default(true)
+  failedVerificationCount Int         @default(0)
+  lockedUntil             DateTime?
+
+  @@index([userId])
+  @@index([secret])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
 }
 
 // ─── Alertes ───────────────────────────────────────────────────────────────
@@ -396,8 +482,19 @@ model Alerte {
   redeclenchements Int          @default(0)
   abonnementExpire Boolean      @default(false)
   intervention    Boolean       @default(false) // formule du foyer au moment de l'alerte
-  operateurId     String?
+  operateurId     String? // dernier opérateur à avoir accepté l'alerte
   operateur       Utilisateur?  @relation("Operateur", fields: [operateurId], references: [id])
+  // Répartition : attribuée à un opérateur, qui doit l'accepter dans le délai (sinon elle passe au suivant).
+  // Sans attribution, l'alerte est dans la file commune.
+  attribueeAId    String?
+  attribueeA      Utilisateur?  @relation("Attribution", fields: [attribueeAId], references: [id])
+  attribueeLe     DateTime?
+  accepteeLe      DateTime?
+  relanceLe       DateTime? // signalée au superviseur pour inactivité
+  // Regroupement par incident : les alertes voisines du même type suivent l'alerte principale.
+  principaleId    String?
+  principale      Alerte?       @relation("Regroupement", fields: [principaleId], references: [id])
+  rattachees      Alerte[]      @relation("Regroupement")
   uniteId         String?
   unite           Unite?        @relation(fields: [uniteId], references: [id])
   issue           String?
@@ -412,6 +509,8 @@ model Alerte {
 
   @@index([statut, creeLe])
   @@index([supportId, type, statut])
+  @@index([attribueeAId, statut])
+  @@index([principaleId])
 }
 
 model EvenementAlerte {

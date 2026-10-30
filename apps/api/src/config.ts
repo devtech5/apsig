@@ -15,4 +15,10 @@ export const config = {
   trustProxy: process.env.TRUST_PROXY === "1",
   // Déclenchements d'alerte max par minute et par IP.
   limiteAlertesParMinute: Number(process.env.RATE_LIMIT_ALERTES ?? 6),
+  // Adresse de la centrale : les cookies de session sont posés sur ce domaine (l'API y est relayée).
+  centraleUrl: process.env.CENTRALE_URL ?? "http://localhost:3002",
+  // Clé de signature des sessions, obligatoire en production.
+  authSecret: process.env.BETTER_AUTH_SECRET,
+  // Double authentification (application TOTP) exigée pour tout le back-office, sauf CENTRALE_2FA=facultatif.
+  deuxFacteursObligatoire: process.env.CENTRALE_2FA !== "facultatif",
 };

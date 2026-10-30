@@ -4,7 +4,8 @@
 import { distanceM, formatDistance, type Position } from "./geo.ts";
 import { estFixe, type TypeSupport } from "./supports.ts";
 
-export type StatutRappel = "EN_ATTENTE" | "CONFIRME" | "EN_SECURITE" | "INJOIGNABLE" | "FAUSSE_ALERTE";
+export const STATUTS_RAPPEL = ["EN_ATTENTE", "CONFIRME", "EN_SECURITE", "INJOIGNABLE", "FAUSSE_ALERTE"] as const;
+export type StatutRappel = (typeof STATUTS_RAPPEL)[number];
 export type SourceAlerte = "QR" | "USSD" | "SMS" | "CENTRALE";
 
 export type ContexteFiabilite = {

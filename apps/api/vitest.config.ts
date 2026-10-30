@@ -13,7 +13,8 @@ export default defineConfig({
   plugins: [swc.vite({ module: { type: "es6" } })],
   test: {
     globalSetup: ["test/global-setup.ts"],
-    env: { DATABASE_URL: testDatabaseUrl, RATE_LIMIT_ALERTES: "1000" },
+    // La double authentification n'est exigée que dans les tests qui la vérifient.
+    env: { DATABASE_URL: testDatabaseUrl, RATE_LIMIT_ALERTES: "1000", CENTRALE_2FA: "facultatif" },
     fileParallelism: false,
     testTimeout: 20_000,
     hookTimeout: 60_000,

@@ -1,6 +1,6 @@
 # API CODE-SECOURS — image de production.
 # À construire depuis la racine du monorepo : docker build -f apps/api/Dockerfile .
-# Variables attendues à l'exécution : DATABASE_URL, PUBLIC_ALERT_URL, CORS_ORIGINS, TRUST_PROXY (cf. README).
+# Variables attendues à l'exécution : DATABASE_URL, PUBLIC_ALERT_URL, CORS_ORIGINS, TRUST_PROXY, CENTRALE_URL, BETTER_AUTH_SECRET (cf. README).
 
 FROM node:22-bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*

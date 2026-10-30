@@ -3,55 +3,17 @@ import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { genererJeton, type TypeSupport } from "@apsig/domain";
+import { genererJeton } from "@apsig/domain";
 import { AppModule } from "../src/app.module.ts";
 import { PrismaService } from "../src/prisma/prisma.service.ts";
+import { creerFoyer as creerFoyerDeTest, preparerReferentiel, viderFile } from "./outils.ts";
 
 let app: INestApplication;
 let db: PrismaService;
 let api: ReturnType<typeof request>;
 let quartierId: string;
-const ADRESSE = { lat: 6.8905, lng: -6.4425 };
-const JOUR = 86_400_000;
 
-async function creerFoyer(opts: { abonnement?: "actif" | "expire" | "aucun"; intervention?: boolean } = {}) {
-  const formule = await db.formule.upsert({
-    where: { code: opts.intervention ? "TEST_SECU" : "TEST_FAMILLE" },
-    update: {},
-    create: { code: opts.intervention ? "TEST_SECU" : "TEST_FAMILLE", nom: "Formule de test", prixFcfa: 1000, intervention: !!opts.intervention },
-  });
-  const now = Date.now();
-  const abonnement = opts.abonnement ?? "actif";
-  const foyer = await db.foyer.create({
-    data: {
-      libelle: "Foyer de test",
-      quartierId,
-      ...ADRESSE,
-      adresseVerifiee: true,
-      cleClient: genererJeton(24),
-      membres: { create: [{ role: "TITULAIRE", prenom: "Awa", nom: "Testeur", telephone: "+225 07 99 99 99 01" }] },
-      contacts: { create: [{ nom: "Proche Testeur", relation: "Sœur", telephone: "+225 07 99 99 99 02" }] },
-      ...(abonnement !== "aucun" && {
-        abonnements: {
-          create: {
-            formuleId: formule.id,
-            statut: abonnement === "actif" ? "ACTIF" : "EXPIRE",
-            debut: new Date(now - 90 * JOUR),
-            fin: new Date(abonnement === "actif" ? now + 30 * JOUR : now - JOUR),
-          },
-        },
-      }),
-    },
-  });
-  const jetons = {} as Record<TypeSupport, string>;
-  for (const type of ["PORTAIL", "INTERIEUR", "BRACELET"] as const) {
-    const s = await db.support.create({
-      data: { type, code: `TST-${genererJeton(8)}`, jeton: genererJeton(), codeCourt: genererJeton(8), statut: "ACTIF", foyerId: foyer.id },
-    });
-    jetons[type] = s.jeton;
-  }
-  return { foyer, jetons };
-}
+const creerFoyer = (opts?: Parameters<typeof creerFoyerDeTest>[2]) => creerFoyerDeTest(db, quartierId, opts);
 
 beforeAll(async () => {
   const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -59,23 +21,8 @@ beforeAll(async () => {
   await app.init();
   db = app.get(PrismaService);
   api = request(app.getHttpServer());
-
-  const ville = await db.ville.upsert({ where: { code: "TST" }, update: {}, create: { code: "TST", nom: "Ville de test" } });
-  const quartier = await db.quartier.upsert({
-    where: { villeId_code: { villeId: ville.id, code: "CENTRE" } },
-    update: {},
-    create: { code: "CENTRE", nom: "Centre", villeId: ville.id, ...ADRESSE },
-  });
-  quartierId = quartier.id;
-  if ((await db.partenaire.count({ where: { type: "POLICE" } })) === 0) {
-    await db.partenaire.createMany({
-      data: [
-        { type: "POLICE", nom: "Police test", telephone: "111" },
-        { type: "GSPM", nom: "GSPM test", telephone: "180" },
-        { type: "SAMU", nom: "SAMU test", telephone: "185" },
-      ],
-    });
-  }
+  quartierId = await preparerReferentiel(db);
+  await viderFile(db);
 });
 
 afterAll(async () => {
@@ -121,10 +68,10 @@ describe("Scan d'un support", () => {
 
 describe("Déclenchement d'une alerte", () => {
   it("crée l'alerte, calcule la fiabilité et met en file les messages", async () => {
-    const { jetons } = await creerFoyer();
+    const { jetons, position } = await creerFoyer();
     const r = await api
       .post("/public/alertes")
-      .send({ jeton: jetons.PORTAIL, type: "AGRESSION", appareilId: `appareil-${genererJeton(10)}`, position: { ...ADRESSE, precisionM: 12 } })
+      .send({ jeton: jetons.PORTAIL, type: "AGRESSION", appareilId: `appareil-${genererJeton(10)}`, position: { ...position, precisionM: 12 } })
       .expect(201);
     expect(r.body).toMatchObject({ type: "AGRESSION", statut: "NOUVELLE", doublon: false, positionPartagee: true, peutAnnuler: true });
     expect(r.body.numero).toMatch(/^ALR-\d{6}$/);
@@ -153,9 +100,8 @@ describe("Déclenchement d'une alerte", () => {
     const appareilId = `appareil-${genererJeton(10)}`;
     const premier = await creerFoyer();
     const second = await creerFoyer();
-    const position = { ...ADRESSE, precisionM: 12 };
-    await api.post("/public/alertes").send({ jeton: premier.jetons.PORTAIL, type: "INCENDIE", appareilId, position }).expect(201);
-    const r = await api.post("/public/alertes").send({ jeton: second.jetons.PORTAIL, type: "INCENDIE", appareilId, position }).expect(201);
+    await api.post("/public/alertes").send({ jeton: premier.jetons.PORTAIL, type: "INCENDIE", appareilId, position: { ...premier.position, precisionM: 12 } }).expect(201);
+    const r = await api.post("/public/alertes").send({ jeton: second.jetons.PORTAIL, type: "INCENDIE", appareilId, position: { ...second.position, precisionM: 12 } }).expect(201);
     const a = await db.alerte.findUniqueOrThrow({ where: { numero: r.body.numero } });
     expect(a.scoreFiabilite).toBe(80);
   });

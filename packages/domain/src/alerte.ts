@@ -1,7 +1,17 @@
 import type { TypeUrgence } from "./urgences.ts";
 
 // Valeurs alignées sur l'enum StatutAlerte de @apsig/db.
-export type StatutAlerte = "NOUVELLE" | "PRISE_EN_CHARGE" | "EN_ROUTE" | "SUR_PLACE" | "CLOTUREE" | "ANNULEE";
+export const STATUTS_ALERTE = ["NOUVELLE", "PRISE_EN_CHARGE", "EN_ROUTE", "SUR_PLACE", "CLOTUREE", "ANNULEE"] as const;
+export type StatutAlerte = (typeof STATUTS_ALERTE)[number];
+
+export const LIBELLES_STATUT: Record<StatutAlerte, string> = {
+  NOUVELLE: "Nouvelle",
+  PRISE_EN_CHARGE: "Prise en charge",
+  EN_ROUTE: "Unité en route",
+  SUR_PLACE: "Unité sur place",
+  CLOTUREE: "Clôturée",
+  ANNULEE: "Annulée",
+};
 
 export const STATUTS_OUVERTS: ReadonlySet<StatutAlerte> = new Set(["NOUVELLE", "PRISE_EN_CHARGE", "EN_ROUTE", "SUR_PLACE"]);
 export const estOuverte = (s: StatutAlerte) => STATUTS_OUVERTS.has(s);
@@ -16,6 +26,7 @@ const TRANSITIONS: Record<StatutAlerte, StatutAlerte[]> = {
 };
 
 export const peutPasser = (de: StatutAlerte, vers: StatutAlerte) => TRANSITIONS[de].includes(vers);
+export const statutsSuivants = (de: StatutAlerte): StatutAlerte[] => [...TRANSITIONS[de]];
 
 export function transition(de: StatutAlerte, vers: StatutAlerte): StatutAlerte {
   if (!peutPasser(de, vers)) throw new Error(`Transition interdite : ${de} → ${vers}`);
