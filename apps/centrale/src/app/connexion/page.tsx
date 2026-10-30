@@ -26,9 +26,11 @@ export default function Connexion() {
       } else router.replace("/");
     } catch (err) {
       const statut = err instanceof ErreurApi ? err.statut : 0;
+      // Un 403 sans compte désactivé : l'API ne reconnaît pas l'adresse de la centrale (CENTRALE_URL).
       setErreur(
         statut === 401 ? "E-mail ou mot de passe incorrect"
-        : statut === 403 ? "Ce compte est désactivé"
+        : statut === 403 && err instanceof Error && err.message === "Ce compte est désactivé" ? "Ce compte est désactivé"
+        : statut === 403 ? "Connexion refusée par le serveur : adresse de la centrale non autorisée (CENTRALE_URL)"
         : statut === 429 ? "Trop de tentatives. Réessayez dans une minute"
         : "Connexion au serveur impossible",
       );

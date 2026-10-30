@@ -20,6 +20,10 @@ function cle() {
 }
 
 export function creerAuth(db: PrismaClient) {
+  // Sans elle, toute connexion depuis la centrale est refusée (« Invalid origin »).
+  if (process.env.NODE_ENV === "production" && !process.env.CENTRALE_URL) {
+    Logger.error("CENTRALE_URL manquant : connexions à la centrale refusées", "Auth");
+  }
   return betterAuth({
     database: prismaAdapter(db, { provider: "postgresql" }),
     secret: cle(),
