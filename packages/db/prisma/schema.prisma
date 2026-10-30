@@ -58,6 +58,7 @@ model Quartier {
 
 model Foyer {
   id              String          @id @default(cuid())
+  numero          Int?            @unique // entre dans le code des supports (DAL-LOBIA-053, ENF-0053-01)
   libelle         String // « Villa 453, Lobia »
   adresse         String?
   quartierId      String

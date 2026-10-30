@@ -5,3 +5,4 @@ export * from "./fiabilite.ts";
 export * from "./alerte.ts";
 export * from "./repartition.ts";
 export * from "./roles.ts";
+export * from "./abonnements.ts";

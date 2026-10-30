@@ -20,9 +20,17 @@ const COULEURS: Record<TypeUrgence, string> = {
   AUTRE: "#475569",
 };
 
-type Props = { points: PointCarte[]; className?: string; onChoisir?: (numero: string) => void };
+type Props = {
+  points: PointCarte[];
+  className?: string;
+  onChoisir?: (numero: string) => void;
+  // Clic sur la carte : place un point (adresse d'un foyer).
+  onPlacer?: ((p: { lat: number; lng: number }) => void) | undefined;
+  // Vue de départ quand il n'y a aucun point (quartier choisi).
+  centre?: { lat: number; lng: number } | null | undefined;
+};
 
-export function Carte({ points, className, onChoisir }: Props) {
+export function Carte({ points, className, onChoisir, onPlacer, centre }: Props) {
   const conteneur = useRef<HTMLDivElement>(null);
   const carte = useRef<CarteMapLibre | null>(null);
   const reperes = useRef<Marker[]>([]);
@@ -30,6 +38,8 @@ export function Carte({ points, className, onChoisir }: Props) {
   const [erreur, setErreur] = useState(false);
   const choisir = useRef(onChoisir);
   choisir.current = onChoisir;
+  const placer = useRef(onPlacer);
+  placer.current = onPlacer;
 
   useEffect(() => {
     let annule = false;
@@ -41,6 +51,7 @@ export function Carte({ points, className, onChoisir }: Props) {
       try {
         const m = new Map({ container: conteneur.current, style: STYLE, center: DALOA, zoom: 12, attributionControl: { compact: true } });
         m.addControl(new NavigationControl({ showCompass: false }), "top-right");
+        m.on("click", (e) => placer.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
         carte.current = m;
         setPrete(true);
       } catch {
@@ -86,6 +97,14 @@ export function Carte({ points, className, onChoisir }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- la signature résume les points
   }, [prete, signature]);
 
+  const lat = centre?.lat;
+  const lng = centre?.lng;
+  useEffect(() => {
+    if (!prete || !carte.current || lat == null || lng == null || points.length > 0) return;
+    carte.current.jumpTo({ center: [lng, lat], zoom: 15 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recentrer seulement quand le centre change
+  }, [prete, lat, lng]);
+
   if (erreur) return <p className="rounded-xl bg-fond p-4 text-sm text-attenue">Carte indisponible sur ce poste (WebGL désactivé).</p>;
-  return <div ref={conteneur} className={className} role="region" aria-label="Carte" />;
+  return <div ref={conteneur} className={`${className ?? ""} ${onPlacer ? "[&_canvas]:cursor-crosshair" : ""}`} role="region" aria-label="Carte" />;
 }

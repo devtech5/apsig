@@ -32,6 +32,16 @@ body {
   color: var(--color-encre);
 }
 
+/* Planche de QR (espace abonnements). */
+@page {
+  size: A4;
+  margin: 10mm;
+}
+
+@media print {
+  body { background: white; }
+}
+
 /* Alerte non prise en charge : le liseré clignote jusqu'à la prise en charge. */
 @keyframes clignote {
   0%, 100% { opacity: 1; }

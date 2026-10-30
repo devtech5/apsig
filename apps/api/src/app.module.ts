@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ThrottlerModule } from "@nestjs/throttler";
+import { AbonnementsModule } from "./abonnements/abonnements.module.ts";
 import { AlertesModule } from "./alertes/alertes.module.ts";
 import { AuthModule } from "./auth/auth.module.ts";
 import { CentraleModule } from "./centrale/centrale.module.ts";
@@ -16,6 +17,7 @@ import { SanteController } from "./sante/sante.controller.ts";
     AuthModule,
     AlertesModule,
     CentraleModule,
+    AbonnementsModule,
   ],
   controllers: [SanteController],
 })

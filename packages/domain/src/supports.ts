@@ -27,21 +27,23 @@ const pad = (n: number, width: number) => String(n).padStart(width, "0");
 const slug = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-// Code lisible imprimé sur le support (jamais encodé dans le QR).
+// Code lisible imprimé sur le support (jamais encodé dans le QR). `numero` est celui du foyer,
+// `rang` distingue plusieurs supports du même type dans un foyer.
 // Portail, format adaptatif : VILLE-QUARTIER-NNN (DAL-LOBIA-053), ou
 // VILLE-COMMUNE-QUARTIER-NNN pour une ville découpée en communes (ABJ-YOP-NIANGON-453).
 export function codeSupport(
   type: TypeSupport,
   p: { ville?: string; commune?: string; quartier?: string; numero: number; rang?: number },
 ): string {
+  const suffixe = p.rang && p.rang > 1 ? `-${p.rang}` : "";
   switch (type) {
     case "PORTAIL":
       if (!p.ville || !p.quartier) throw new Error("Ville et quartier requis pour un QR portail");
-      return [p.ville, p.commune, p.quartier].filter(Boolean).map((s) => slug(s!)).join("-") + `-${pad(p.numero, 3)}`;
+      return [p.ville, p.commune, p.quartier].filter(Boolean).map((s) => slug(s!)).join("-") + `-${pad(p.numero, 3)}${suffixe}`;
     case "BRACELET":
       return `ENF-${pad(p.numero, 4)}-${pad(p.rang ?? 1, 2)}`;
     default:
-      return `${SUPPORTS[type].prefixe}-${pad(p.numero, 4)}`;
+      return `${SUPPORTS[type].prefixe}-${pad(p.numero, 4)}${suffixe}`;
   }
 }
 

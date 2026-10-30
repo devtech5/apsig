@@ -35,7 +35,7 @@ export function Coque({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-brand px-4 py-2 text-white">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-brand px-4 py-2 text-white print:hidden">
         <Link href={accueilDe(compte.espaces)} className="flex items-center gap-2">
           <img src="/logo-apsig.svg" alt="" width={24} height={28} className="h-7 w-6" />
           <span className="leading-tight">
@@ -150,7 +150,7 @@ function EtatCentrale() {
 function BandeauCrise() {
   const { crise } = useCentrale()!.file!;
   return (
-    <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-danger px-4 py-2 text-sm text-white">
+    <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-danger px-4 py-2 text-sm text-white print:hidden">
       <Icone nom="alerte" className="size-5 shrink-0" />
       <strong>Mode crise</strong>
       <span>

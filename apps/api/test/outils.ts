@@ -1,6 +1,11 @@
 // Données de test partagées par les suites e2e.
 import { createHmac } from "node:crypto";
+import type { INestApplication } from "@nestjs/common";
+import request from "supertest";
+import type { RoleUtilisateur } from "@apsig/db";
 import { genererJeton, STATUTS_OUVERTS, type TypeSupport } from "@apsig/domain";
+import { definirMotDePasse } from "../src/auth/comptes.ts";
+import { config } from "../src/config.ts";
 import type { PrismaService } from "../src/prisma/prisma.service.ts";
 
 export const ADRESSE = { lat: 6.8905, lng: -6.4425 };
@@ -24,6 +29,16 @@ export function codeTotp(secretBase32: string, maintenant = Date.now()) {
   const h = createHmac("sha1", cle).update(compteur).digest();
   const decalage = h[h.length - 1]! & 15;
   return ((h.readUInt32BE(decalage) & 0x7fffffff) % 1_000_000).toString().padStart(6, "0");
+}
+
+// Compte du back-office et session ouverte comme le ferait le navigateur de la centrale (même origine).
+export async function connecter(app: INestApplication, db: PrismaService, role: RoleUtilisateur, opts: { actif?: boolean } = {}) {
+  const email = `${role.toLowerCase()}-${genererJeton(6).toLowerCase()}@apsig.test`;
+  const { utilisateur, motDePasse } = await definirMotDePasse(db, { email, nom: `${role} ${genererJeton(4)}`, role });
+  if (opts.actif === false) await db.utilisateur.update({ where: { id: utilisateur.id }, data: { actif: false } });
+  const agent = request.agent(app.getHttpServer());
+  const r = await agent.post("/api/auth/sign-in/email").set("Origin", config.centraleUrl).send({ email, password: motDePasse });
+  return { agent, utilisateur, motDePasse, connexion: r };
 }
 
 // La base de test est conservée d'une exécution à l'autre : chaque suite repart d'une file vide.

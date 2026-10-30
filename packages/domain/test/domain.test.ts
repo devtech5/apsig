@@ -52,6 +52,13 @@ describe("Supports", () => {
     expect(codeSupport("INTERIEUR", { numero: 453 })).toBe("INT-0453");
   });
 
+  it("distingue plusieurs supports du même type dans un foyer", () => {
+    expect(codeSupport("BRACELET", { numero: 453, rang: 2 })).toBe("ENF-0453-02");
+    expect(codeSupport("CARTE_VOYAGEUR", { numero: 453, rang: 1 })).toBe("VOY-0453");
+    expect(codeSupport("CARTE_VOYAGEUR", { numero: 453, rang: 2 })).toBe("VOY-0453-2");
+    expect(codeSupport("PORTAIL", { ville: "DAL", quartier: "Lobia", numero: 53, rang: 2 })).toBe("DAL-LOBIA-053-2");
+  });
+
   it("exige ville et quartier pour un QR portail", () => {
     expect(() => codeSupport("PORTAIL", { numero: 1 })).toThrow();
   });

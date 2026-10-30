@@ -5,7 +5,6 @@ import { Test } from "@nestjs/testing";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { genererJeton } from "@apsig/domain";
 import type { RoleUtilisateur } from "@apsig/db";
 import { AppModule } from "../src/app.module.ts";
 import { configurerApp } from "../src/app.setup.ts";
@@ -14,7 +13,7 @@ import { definirMotDePasse } from "../src/auth/comptes.ts";
 import { config } from "../src/config.ts";
 import { PrismaService } from "../src/prisma/prisma.service.ts";
 import { RepartitionService } from "../src/repartition/repartition.service.ts";
-import { codeTotp, creerFoyer, preparerReferentiel, viderFile } from "./outils.ts";
+import { codeTotp, connecter as connecterCompte, creerFoyer, preparerReferentiel, viderFile } from "./outils.ts";
 
 let app: NestExpressApplication;
 let db: PrismaService;
@@ -25,15 +24,7 @@ type Resume = { numero: string; statut: string; priorite: string; attribueeA: { 
 
 const dans = (s: number) => new Date(Date.now() + s * 1000);
 
-// Session ouverte comme le ferait le navigateur de la centrale (même origine).
-async function connecter(role: RoleUtilisateur, opts: { actif?: boolean } = {}) {
-  const email = `${role.toLowerCase()}-${genererJeton(6).toLowerCase()}@apsig.test`;
-  const { utilisateur, motDePasse } = await definirMotDePasse(db, { email, nom: `${role} ${genererJeton(4)}`, role });
-  if (opts.actif === false) await db.utilisateur.update({ where: { id: utilisateur.id }, data: { actif: false } });
-  const agent = request.agent(app.getHttpServer());
-  const r = await agent.post("/api/auth/sign-in/email").set("Origin", config.centraleUrl).send({ email, password: motDePasse });
-  return { agent, utilisateur, motDePasse, connexion: r };
-}
+const connecter = (role: RoleUtilisateur, opts: { actif?: boolean } = {}) => connecterCompte(app, db, role, opts);
 
 const cookies = (r: request.Response) => ([] as string[]).concat(r.headers["set-cookie"] ?? []).map((c) => c.split(";")[0]).join("; ");
 
