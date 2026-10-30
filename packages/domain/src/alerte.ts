@@ -16,6 +16,10 @@ export const LIBELLES_STATUT: Record<StatutAlerte, string> = {
 export const STATUTS_OUVERTS: ReadonlySet<StatutAlerte> = new Set(["NOUVELLE", "PRISE_EN_CHARGE", "EN_ROUTE", "SUR_PLACE"]);
 export const estOuverte = (s: StatutAlerte) => STATUTS_OUVERTS.has(s);
 
+// Valeurs alignées sur l'enum ProblemePosition de @apsig/db : pourquoi la position du témoin manque.
+export const PROBLEMES_POSITION = ["REFUSEE", "INDISPONIBLE"] as const;
+export type ProblemePosition = (typeof PROBLEMES_POSITION)[number];
+
 const TRANSITIONS: Record<StatutAlerte, StatutAlerte[]> = {
   NOUVELLE: ["PRISE_EN_CHARGE", "CLOTUREE", "ANNULEE"],
   PRISE_EN_CHARGE: ["EN_ROUTE", "SUR_PLACE", "CLOTUREE", "ANNULEE"],

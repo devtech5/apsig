@@ -125,7 +125,8 @@ export class CentraleService {
       priseEnChargeLe: a.priseEnChargeLe,
       surPlaceLe: a.surPlaceLe,
       issue: a.issue,
-      temoin:a.temoinLat != null && a.temoinLng != null ? { lat: a.temoinLat, lng: a.temoinLng, precisionM: a.temoinPrecisionM } : null,
+      temoin:
+        a.temoinLat != null && a.temoinLng != null ? { lat: a.temoinLat, lng: a.temoinLng, precisionM: a.temoinPrecisionM, le: a.temoinPositionLe } : null,
       porteur: porteur && { prenom: porteur.prenom, nom: porteur.nom, anneeNaissance: porteur.anneeNaissance, infosMedicales: porteur.infosMedicales },
       foyer: foyer && {
         libelle: foyer.libelle,
@@ -380,6 +381,7 @@ export class CentraleService {
       support: { type: a.support.type, libelle: SUPPORTS[a.support.type].libelle, code: a.support.code },
       lieu: q ? `${q.nom}, ${q.ville.nom}` : null,
       position: a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null,
+      problemePosition: a.problemePosition,
       scoreFiabilite: a.scoreFiabilite,
       rappel: a.rappel,
       // Tant que personne n'a pris l'alerte, l'escalade se lit à l'horloge.

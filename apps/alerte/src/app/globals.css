@@ -43,8 +43,17 @@ body {
   animation: pulsation 1.6s ease-in-out infinite;
 }
 
+@keyframes pulsation-rouge {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(220 38 38 / 0.5); }
+  50% { box-shadow: 0 0 0 12px rgb(220 38 38 / 0); }
+}
+
+.pulsation-rouge {
+  animation: pulsation-rouge 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .pulsation { animation: none; }
+  .pulsation, .pulsation-rouge { animation: none; }
 }
 
 /* Viseur du scanner : quatre coins blancs, sans image. */

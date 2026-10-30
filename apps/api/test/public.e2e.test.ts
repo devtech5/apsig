@@ -143,6 +143,47 @@ describe("Suivi par le témoin", () => {
     expect(a).toMatchObject({ lat: marche.lat, lng: marche.lng, scoreFiabilite: 75 });
   });
 
+  it("suivi continu : la position suit le témoin, seul un vrai déplacement est inscrit au fil", async () => {
+    const { jetons } = await creerFoyer();
+    const depart = { lat: 6.8901, lng: -6.4389, precisionM: 30 };
+    const r = await api.post("/public/alertes").send({ jeton: jetons.BRACELET, type: "EGARE", position: depart }).expect(201);
+    const { numero, cleTemoin } = r.body;
+    const deplacements = async () =>
+      (await db.evenementAlerte.findMany({ where: { alerte: { numero }, texte: { startsWith: "Le témoin s'est déplacé" } } })).map((e) => e.texte);
+
+    // ~11 m : même endroit, mesure affinée.
+    await api.post(`/public/alertes/${numero}/position`).send({ cle: cleTemoin, position: { ...depart, lat: depart.lat + 0.0001, precisionM: 8 } }).expect(200);
+    expect(await deplacements()).toEqual([]);
+
+    // ~110 m plus loin.
+    await api.post(`/public/alertes/${numero}/position`).send({ cle: cleTemoin, position: { ...depart, lat: depart.lat + 0.001, precisionM: 8 } }).expect(200);
+    expect(await deplacements()).toEqual(["Le témoin s'est déplacé de 100 m (précision 8 m)"]);
+    const a = await db.alerte.findUniqueOrThrow({ where: { numero } });
+    expect(a.lat).toBeCloseTo(depart.lat + 0.001);
+    expect(a.temoinPositionLe).not.toBeNull();
+  });
+
+  it("localisation refusée ou GPS coupé : signalé à la centrale, effacé dès qu'une position arrive", async () => {
+    const { jetons } = await creerFoyer();
+    const r = await api.post("/public/alertes").send({ jeton: jetons.BRACELET, type: "MEDICAL", problemePosition: "REFUSEE" }).expect(201);
+    const { numero, cleTemoin } = r.body;
+    const alerte = () => db.alerte.findUniqueOrThrow({ where: { numero }, include: { evenements: true } });
+    let a = await alerte();
+    expect(a.problemePosition).toBe("REFUSEE");
+    expect(a.evenements.some((e) => e.texte.startsWith("Le témoin a refusé la localisation"))).toBe(true);
+
+    await api.post(`/public/alertes/${numero}/position/probleme`).send({ cle: "mauvaise-cle", probleme: "INDISPONIBLE" }).expect(403);
+    await api.post(`/public/alertes/${numero}/position/probleme`).send({ cle: cleTemoin, probleme: "AUTRE" }).expect(400);
+    await api.post(`/public/alertes/${numero}/position/probleme`).send({ cle: cleTemoin, probleme: "INDISPONIBLE" }).expect(200);
+    await api.post(`/public/alertes/${numero}/position/probleme`).send({ cle: cleTemoin, probleme: "INDISPONIBLE" }).expect(200);
+    a = await alerte();
+    expect(a.problemePosition).toBe("INDISPONIBLE");
+    expect(a.evenements.filter((e) => e.texte.startsWith("Localisation impossible")).length).toBe(1);
+
+    await api.post(`/public/alertes/${numero}/position`).send({ cle: cleTemoin, position: { lat: 6.8811, lng: -6.4479, precisionM: 15 } }).expect(200);
+    expect((await alerte()).problemePosition).toBeNull();
+  });
+
   it("consultation et annulation protégées par la clé du témoin", async () => {
     const { jetons } = await creerFoyer();
     const r = await api.post("/public/alertes").send({ jeton: jetons.PORTAIL, type: "AUTRE" }).expect(201);

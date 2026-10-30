@@ -453,6 +453,12 @@ enum StatutRappel {
   FAUSSE_ALERTE
 }
 
+// Pourquoi la position du témoin manque : la centrale doit alors le rappeler.
+enum ProblemePosition {
+  REFUSEE // localisation refusée dans le navigateur
+  INDISPONIBLE // GPS coupé, pas de signal, ou navigateur sans localisation
+}
+
 model Alerte {
   id              String        @id @default(cuid())
   numero          String        @unique // ALR-000123
@@ -474,6 +480,8 @@ model Alerte {
   temoinLat       Float?
   temoinLng       Float?
   temoinPrecisionM Float?
+  temoinPositionLe DateTime? // dernière position reçue (le témoin est suivi tant que l'alerte est ouverte)
+  problemePosition ProblemePosition? // effacé dès qu'une position arrive
   cleTemoin       String        @unique // autorise le témoin à suivre / annuler
   // Traitement
   scoreFiabilite  Int

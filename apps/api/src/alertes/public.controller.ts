@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import { z } from "zod";
-import { TYPES_URGENCE } from "@apsig/domain";
+import { PROBLEMES_POSITION, TYPES_URGENCE } from "@apsig/domain";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { AlertesService } from "./alertes.service.ts";
 
@@ -17,10 +17,13 @@ const creation = z.object({
   // Identifiant pseudonyme aléatoire généré par la page d'alerte (aucune donnée de l'appareil).
   appareilId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/).optional(),
   position: position.optional(),
+  // Sans position : la page dit pourquoi (refus, GPS coupé), la centrale sait qu'il faut rappeler.
+  problemePosition: z.enum(PROBLEMES_POSITION).optional(),
 });
 
 const cle = z.object({ cle: z.string().min(1).max(64) });
 const partagePosition = cle.extend({ position });
+const problemePosition = cle.extend({ probleme: z.enum(PROBLEMES_POSITION) });
 
 // Routes publiques, appelées par la page d'alerte sur le téléphone du témoin.
 @Controller("public")
@@ -48,6 +51,12 @@ export class PublicController {
   @HttpCode(200)
   async position(@Param("numero") numero: string, @Body(new ZodPipe(partagePosition)) body: z.infer<typeof partagePosition>) {
     return this.alertes.vuePublique(await this.alertes.partagerPosition(numero, body.cle, body.position));
+  }
+
+  @Post("alertes/:numero/position/probleme")
+  @HttpCode(200)
+  async problemePosition(@Param("numero") numero: string, @Body(new ZodPipe(problemePosition)) body: z.infer<typeof problemePosition>) {
+    return this.alertes.vuePublique(await this.alertes.signalerProblemePosition(numero, body.cle, body.probleme));
   }
 
   @Post("alertes/:numero/annuler")

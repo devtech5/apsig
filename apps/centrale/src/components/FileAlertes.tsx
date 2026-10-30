@@ -142,6 +142,9 @@ function Carte({ a, active, onChoisir, maintenant }: { a: AlerteResume; active: 
           <span className="rounded bg-alerte-fond px-1.5 py-0.5 font-semibold text-alerte-encre">Escalade N{a.niveauEscalade}</span>
         )}
         {a.signaleeLe && <span className="rounded bg-danger-fond px-1.5 py-0.5 font-semibold text-danger">Signalée</span>}
+        {a.problemePosition && (
+          <span className="rounded bg-danger-fond px-1.5 py-0.5 font-semibold text-danger">{a.problemePosition === "REFUSEE" ? "Position refusée" : "Sans GPS"}</span>
+        )}
         {a.temoinsRattaches > 0 && <span className="rounded bg-fond px-1.5 py-0.5">+{a.temoinsRattaches} témoin{a.temoinsRattaches > 1 ? "s" : ""}</span>}
         {a.redeclenchements > 0 && <span className="rounded bg-fond px-1.5 py-0.5">×{a.redeclenchements + 1}</span>}
         <span className="text-attenue">

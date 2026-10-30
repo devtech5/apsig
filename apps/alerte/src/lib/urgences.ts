@@ -56,4 +56,5 @@ export const NUMEROS_PUBLICS = [
 export type NomIcone =
   | "bouclier" | "croix" | "flamme" | "recherche" | "stethoscope" | "question"
   | "coche" | "croixFermer" | "repere" | "telephone" | "alerte"
-  | "camera" | "lampe" | "qr";
+  | "camera" | "lampe" | "qr"
+  | "hautParleur" | "cadenas" | "actualiser" | "repereBarre" | "doigt";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LIBELLES_RAPPEL, LIBELLES_STATUT, REPARTITION, type StatutAlerte, type StatutRappel } from "@apsig/domain";
+import { LIBELLES_RAPPEL, LIBELLES_STATUT, REPARTITION, type ProblemePosition, type StatutAlerte, type StatutRappel } from "@apsig/domain";
 import type { AlerteDetail, MembreEquipe } from "@/lib/api";
 import { dateHeure, duree, heure, lienCarte } from "@/lib/format";
 import { Carte } from "./Carte";
@@ -21,6 +21,11 @@ const RAPPELS: [StatutRappel, string][] = [
   ["INJOIGNABLE", "Injoignable"],
   ["FAUSSE_ALERTE", "Fausse alerte"],
 ];
+
+const PROBLEMES_POSITION: Record<ProblemePosition, string> = {
+  REFUSEE: "Le témoin a refusé la localisation",
+  INDISPONIBLE: "Localisation impossible sur le téléphone du témoin (GPS coupé ou sans signal)",
+};
 
 const NIVEAU_FIABILITE = {
   ELEVEE: { texte: "Fiabilité élevée", classe: "bg-succes-fond text-succes" },
@@ -161,13 +166,21 @@ export function FicheAlerte({ a, maintenant, agir, onChoisir, equipe }: Props) {
           <p className="pointer-events-none absolute top-3 left-3 rounded-lg bg-white/95 px-3 py-1.5 text-sm font-semibold shadow">
             {a.foyer ? `${a.foyer.libelle} · ${a.foyer.quartier}, ${a.foyer.ville}` : `${a.support.libelle} ${a.support.code}`}
             {a.temoin?.precisionM != null && <span className="font-normal text-attenue"> · témoin à ± {Math.round(a.temoin.precisionM)} m</span>}
+            {a.temoin?.le && ouverte && <span className="font-normal text-attenue"> · vu il y a {duree(a.temoin.le, maintenant)}</span>}
           </p>
+          {a.problemePosition && ouverte && (
+            <p className="absolute inset-x-3 bottom-8 flex items-center gap-2 rounded-lg bg-danger px-3 py-2 text-sm font-bold text-white shadow">
+              <Icone nom="repere" className="size-4" />
+              {PROBLEMES_POSITION[a.problemePosition]}
+              {a.temoin ? " : dernière position connue affichée." : " : rappeler le témoin."}
+            </p>
+          )}
         </section>
       ) : (
         ouverte && (
           <p className="flex items-center gap-2 rounded-2xl bg-danger-fond px-4 py-6 text-base font-bold text-danger">
             <Icone nom="repere" className="size-6" />
-            Position inconnue : rappeler le témoin pour le localiser.
+            {a.problemePosition ? PROBLEMES_POSITION[a.problemePosition] : "Position inconnue"} : rappeler le témoin pour le localiser.
           </p>
         )
       )}

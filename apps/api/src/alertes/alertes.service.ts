@@ -4,6 +4,7 @@ import type { Alerte, Prisma, TypePartenaire } from "@apsig/db";
 import {
   calculerFiabilite,
   destinatairesPour,
+  distanceM,
   estFixe,
   estOuverte,
   FENETRE_DOUBLON_MS,
@@ -20,6 +21,7 @@ import {
   trouverIncident,
   URGENCES,
   type Destinataire,
+  type ProblemePosition,
   type SourceAlerte,
   type StatutAlerte,
   type TypeUrgence,
@@ -31,6 +33,12 @@ import { RepartitionService } from "../repartition/repartition.service.ts";
 export type PositionTemoin = { lat: number; lng: number; precisionM?: number | undefined };
 
 const JOUR_MS = 86_400_000;
+// Le témoin est suivi en continu : seul un vrai déplacement est inscrit au fil de l'alerte.
+const DEPLACEMENT_SIGNALE_M = 50;
+const PROBLEMES: Record<ProblemePosition, string> = {
+  REFUSEE: "Le témoin a refusé la localisation : le rappeler pour savoir où il se trouve",
+  INDISPONIBLE: "Localisation impossible sur le téléphone du témoin (GPS coupé ou sans signal) : le rappeler",
+};
 const PARTENAIRES = new Set<Destinataire>(["POLICE", "GSPM", "SAMU", "AMBULANCE_PRIVEE", "INFIRMIER", "SECURITE_PRIVEE"]);
 
 const inclusSupport = {
@@ -84,7 +92,10 @@ export class AlertesService {
     };
   }
 
-  async creer(input: { jeton: string; type: TypeUrgence; appareilId?: string | undefined; position?: PositionTemoin | undefined }, source: SourceAlerte = "QR") {
+  async creer(
+    input: { jeton: string; type: TypeUrgence; appareilId?: string | undefined; position?: PositionTemoin | undefined; problemePosition?: ProblemePosition | undefined },
+    source: SourceAlerte = "QR",
+  ) {
     const resultat = await this.db.$transaction(async (tx) => {
       const support = await this.chargerSupport(tx, input.jeton);
       const maintenant = new Date();
@@ -143,6 +154,8 @@ export class AlertesService {
           temoinLat: input.position?.lat ?? null,
           temoinLng: input.position?.lng ?? null,
           temoinPrecisionM: input.position?.precisionM ?? null,
+          temoinPositionLe: input.position ? maintenant : null,
+          problemePosition: input.position ? null : (input.problemePosition ?? null),
           cleTemoin: genererJeton(24),
           scoreFiabilite: 0, // calculé juste après, avec le contexte complet
           abonnementExpire: !abonnement,
@@ -157,6 +170,7 @@ export class AlertesService {
       } else if (!fixe) {
         await this.evenement(tx, alerte.id, "systeme", input.position ? "Support mobile : position du témoin reçue" : "Support mobile : position du témoin non partagée, à obtenir en rappelant le témoin");
       }
+      if (!input.position && input.problemePosition) await this.evenement(tx, alerte.id, "temoin", PROBLEMES[input.problemePosition]);
       if (!abonnement) await this.evenement(tx, alerte.id, "systeme", "Abonnement expiré ou absent : alerte traitée quand même (l'urgence prime)");
       if (intervention && input.type === "AGRESSION") await this.evenement(tx, alerte.id, "systeme", "Formule Sécurité + : équipe d'intervention APSIG à engager en priorité");
 
@@ -217,15 +231,36 @@ export class AlertesService {
           temoinLat: position.lat,
           temoinLng: position.lng,
           temoinPrecisionM: position.precisionM ?? null,
+          temoinPositionLe: new Date(),
+          problemePosition: null,
           // Support mobile : la position du témoin devient la position d'intervention.
           ...(!estFixe(support.type) && { lat: position.lat, lng: position.lng }),
         },
       });
       const precision = position.precisionM != null ? ` (précision ${Math.round(position.precisionM)} m)` : "";
-      await this.evenement(tx, a.id, "temoin", `Position du témoin reçue${precision}`);
+      if (a.temoinLat == null || a.temoinLng == null) {
+        await this.evenement(tx, a.id, "temoin", `Position du témoin reçue${precision}`);
+      } else {
+        const ecart = distanceM({ lat: a.temoinLat, lng: a.temoinLng }, position);
+        if (ecart >= DEPLACEMENT_SIGNALE_M) await this.evenement(tx, a.id, "temoin", `Le témoin s'est déplacé de ${formatDistance(ecart)}${precision}`);
+      }
       await this.rafraichirFiabilite(tx, a.id);
     });
     this.flux.emettre({ type: "alertes", numero });
+    return this.consulter(numero, cle);
+  }
+
+  // Localisation refusée ou impossible sur le téléphone du témoin : la centrale doit le rappeler.
+  async signalerProblemePosition(numero: string, cle: string, probleme: ProblemePosition) {
+    const nouveau = await this.db.$transaction(async (tx) => {
+      const a = await this.alerteDuTemoin(tx, numero, cle);
+      if (!estOuverte(a.statut)) throw new ConflictException("Alerte déjà clôturée");
+      if (a.problemePosition === probleme) return false;
+      await tx.alerte.update({ where: { id: a.id }, data: { problemePosition: probleme } });
+      await this.evenement(tx, a.id, "temoin", PROBLEMES[probleme]);
+      return true;
+    });
+    if (nouveau) this.flux.emettre({ type: "alertes", numero });
     return this.consulter(numero, cle);
   }
 

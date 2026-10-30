@@ -1,14 +1,16 @@
 "use client";
 
 import type { StatutAlerte, TypeUrgence } from "@apsig/domain";
-import { useCallback, useEffect, useState } from "react";
+import type { ProblemePosition } from "@apsig/domain";
+import { useEffect, useRef, useState } from "react";
 import { appelApi, ErreurApi, type AlertePublique, type SupportPublic } from "@/lib/api";
+import { PROBLEME_DE, usePositionTemoin, vautLaPeine, type EtatPosition, type PositionPrecise } from "@/lib/position";
 import { CONSEILS, STYLE_URGENCE } from "@/lib/urgences";
+import { AideLocalisation } from "./AideLocalisation";
 import { Cadre, NumerosPublics } from "./Cadre";
 import { Icone } from "./Icone";
 
 type Suivi = { numero: string; cle: string };
-type Geo = "demande" | "ok" | "refus" | "indisponible";
 
 const INTERVALLE_SUIVI_MS = 10_000;
 const TERMINES: StatutAlerte[] = ["CLOTUREE", "ANNULEE"];
@@ -54,12 +56,15 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
   const [envoi, setEnvoi] = useState<TypeUrgence | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [geo, setGeo] = useState<Geo | null>(null);
   const [trompe, setTrompe] = useState(false);
   const [confirmerAnnulation, setConfirmerAnnulation] = useState(false);
   const [annulation, setAnnulation] = useState(false);
 
   const termine = alerte != null && TERMINES.includes(alerte.statut);
+  // Position demandée dès l'ouverture de la page, suivie jusqu'à la fin de l'alerte.
+  const localisation = usePositionTemoin(!termine);
+  const derniereEnvoyee = useRef<{ position: PositionPrecise; le: number } | null>(null);
+  const problemeSignale = useRef<ProblemePosition | null>(null);
 
   // Reprise du suivi si la page est rechargée pendant une alerte.
   useEffect(() => {
@@ -69,7 +74,6 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
       .then((a) => {
         setSuivi(enregistre);
         setAlerte(a);
-        if (a.positionPartagee) setGeo("ok");
       })
       .catch(() => ecrire("session", cleSession, null));
   }, [cleSession]);
@@ -100,30 +104,39 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
     };
   }, [suivi, termine]);
 
-  // L'alerte part d'abord ; la position suit, sans jamais retarder l'envoi.
-  const partagerPosition = useCallback((s: Suivi) => {
-    if (!window.isSecureContext || !navigator.geolocation) {
-      setGeo("indisponible");
-      return;
-    }
-    setGeo("demande");
-    navigator.geolocation.getCurrentPosition(
-      async (p) => {
-        try {
-          const a = await appelApi<AlertePublique>(`/public/alertes/${encodeURIComponent(s.numero)}/position`, {
-            methode: "POST",
-            corps: { cle: s.cle, position: { lat: p.coords.latitude, lng: p.coords.longitude, precisionM: p.coords.accuracy } },
-          });
-          setAlerte(a);
-          setGeo("ok");
-        } catch {
-          setGeo("refus");
-        }
-      },
-      () => setGeo("refus"),
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 },
-    );
-  }, []);
+  // Position en direct vers la centrale tant que l'alerte est ouverte (le témoin peut se déplacer).
+  const position = localisation.position;
+  useEffect(() => {
+    if (!suivi || termine || !position) return;
+    const avant = derniereEnvoyee.current;
+    if (!vautLaPeine(avant, position, Date.now())) return;
+    derniereEnvoyee.current = { position, le: Date.now() };
+    appelApi<AlertePublique>(`/public/alertes/${encodeURIComponent(suivi.numero)}/position`, {
+      methode: "POST",
+      corps: { cle: suivi.cle, position },
+    })
+      .then(setAlerte)
+      .catch(() => {
+        derniereEnvoyee.current = avant; // renvoyée à la prochaine mesure
+      });
+  }, [suivi, termine, position]);
+
+  // Refus ou GPS coupé : la centrale le sait tout de suite et rappelle le témoin.
+  const etatPosition = localisation.etat;
+  useEffect(() => {
+    if (etatPosition === "ok") problemeSignale.current = null;
+    const probleme = PROBLEME_DE[etatPosition];
+    if (!suivi || termine || !probleme || problemeSignale.current === probleme) return;
+    problemeSignale.current = probleme;
+    appelApi<AlertePublique>(`/public/alertes/${encodeURIComponent(suivi.numero)}/position/probleme`, {
+      methode: "POST",
+      corps: { cle: suivi.cle, probleme },
+    })
+      .then(setAlerte)
+      .catch(() => {
+        problemeSignale.current = null;
+      });
+  }, [suivi, termine, etatPosition]);
 
   async function declencher(type: TypeUrgence) {
     setEnvoi(type);
@@ -131,19 +144,22 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
     setInfo(null);
     setTrompe(false);
     vibrer(60);
+    // L'alerte n'attend jamais la position : elle part avec ce qui est connu à cet instant.
+    const position = localisation.position ?? undefined;
+    const probleme = position ? undefined : (PROBLEME_DE[localisation.etat] ?? undefined);
     try {
       const r = await appelApi<AlertePublique & { cleTemoin: string; doublon: boolean }>("/public/alertes", {
         methode: "POST",
-        corps: { jeton, type, appareilId: appareilId() },
+        corps: { jeton, type, appareilId: appareilId(), position, problemePosition: probleme },
       });
       const s = { numero: r.numero, cle: r.cleTemoin };
+      derniereEnvoyee.current = position && !r.doublon ? { position, le: Date.now() } : null;
+      problemeSignale.current = probleme && !r.doublon ? probleme : null;
       setSuivi(s);
       setAlerte(r);
       ecrire("session", cleSession, s);
       if (r.doublon) setInfo("Une alerte identique était déjà en cours : la centrale a été relancée.");
       window.scrollTo({ top: 0, behavior: "smooth" });
-      if (r.positionPartagee) setGeo("ok");
-      else partagerPosition(s);
     } catch (e) {
       setErreur(`${e instanceof ErreurApi ? e.message : "Envoi impossible"}. Réessayez ou appelez directement les secours ci-dessous.`);
     } finally {
@@ -173,7 +189,8 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
     ecrire("session", cleSession, null);
     setSuivi(null);
     setAlerte(null);
-    setGeo(null);
+    derniereEnvoyee.current = null;
+    problemeSignale.current = null;
     setInfo(null);
     setErreur(null);
   }
@@ -227,10 +244,7 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
           </button>
         )}
 
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-attenue">
-          <Icone nom="repere" className="size-3.5" />
-          Votre position vous sera demandée après l'envoi, pour guider les secours.
-        </p>
+        <EtatLocalisation etat={localisation.etat} precisionM={localisation.position?.precisionM} onReessayer={localisation.reessayer} />
         <NumerosPublics />
       </Cadre>
     );
@@ -265,6 +279,13 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
       {info && <Bandeau ton="info">{info}</Bandeau>}
       {erreur && <Bandeau ton="erreur">{erreur}</Bandeau>}
 
+      {/* Sans position, l'aide passe avant tout le reste : c'est ce qui permet aux secours de venir. */}
+      {!termine && (localisation.etat === "refusee" || localisation.etat === "indisponible" || localisation.etat === "impossible") ? (
+        <AideLocalisation probleme={localisation.etat} onReessayer={localisation.reessayer} />
+      ) : (
+        !termine && <EtatLocalisation etat={localisation.etat} precisionM={localisation.position?.precisionM} enDirect />
+      )}
+
       {!annulee && (
         <ol aria-label="Suivi de l'alerte" className="grid rounded-2xl border border-ligne bg-white p-4">
           {etapes.map((e, i) => {
@@ -288,20 +309,6 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
             );
           })}
         </ol>
-      )}
-
-      {!termine && geo && (
-        <Bandeau ton={geo === "ok" ? "succes" : geo === "demande" ? "neutre" : "attention"}>
-          {geo === "demande" && "Partage de votre position avec la centrale…"}
-          {geo === "ok" && "Votre position a été partagée avec la centrale."}
-          {geo === "refus" && "Position non partagée : autorisez la localisation pour guider les secours."}
-          {geo === "indisponible" && "Localisation indisponible sur ce téléphone."}
-          {geo === "refus" && suivi && (
-            <button type="button" onClick={() => partagerPosition(suivi)} className="mt-2 block font-bold underline">
-              Réessayer
-            </button>
-          )}
-        </Bandeau>
       )}
 
       {!termine && (
@@ -348,6 +355,57 @@ export function PageAlerte({ jeton, support }: { jeton: string; support: Support
 
       <NumerosPublics />
     </Cadre>
+  );
+}
+
+// Ligne d'état de la position : sur le menu (avant l'envoi) et pendant l'alerte quand tout va bien.
+function EtatLocalisation({
+  etat,
+  precisionM,
+  enDirect = false,
+  onReessayer,
+}: {
+  etat: EtatPosition;
+  precisionM?: number | undefined;
+  enDirect?: boolean;
+  onReessayer?: () => void;
+}) {
+  if (etat === "ok") {
+    const precision = precisionM != null ? ` (± ${Math.round(precisionM)} m)` : "";
+    return (
+      <Bandeau ton="succes">
+        <span className="flex items-center gap-2">
+          <Icone nom="repere" className="size-5 shrink-0" />
+          {enDirect ? `Votre position est suivie en direct par la centrale${precision}.` : `Position trouvée${precision} : elle partira avec l'alerte.`}
+        </span>
+      </Bandeau>
+    );
+  }
+  if (etat === "demande") {
+    return (
+      <Bandeau ton="neutre">
+        <span className="flex items-center gap-2">
+          <Icone nom="repere" className="size-5 shrink-0 animate-pulse text-brand" />
+          {enDirect ? "Recherche de votre position…" : "Touchez « Autoriser » si le téléphone demande votre position : elle guide les secours."}
+        </span>
+      </Bandeau>
+    );
+  }
+  // Avant l'envoi : rappel discret, l'aide complète s'affiche une fois l'alerte partie.
+  return (
+    <Bandeau ton="attention">
+      <span className="flex items-center gap-2">
+        <Icone nom="repereBarre" className="size-5 shrink-0" />
+        <span>
+          {etat === "refusee" ? "Position bloquée" : "Position introuvable"} : l'alerte partira quand même.
+          {onReessayer && etat !== "impossible" && (
+            <button type="button" onClick={onReessayer} className="ml-1 font-bold underline">
+              Réessayer
+            </button>
+          )}
+        </span>
+      </span>
+    </Bandeau>
   );
 }
 

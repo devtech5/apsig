@@ -1,4 +1,4 @@
-import type { Espace, Priorite, Role, StatutAlerte, StatutRappel, TypeSupport, TypeUrgence } from "@apsig/domain";
+import type { Espace, Priorite, ProblemePosition, Role, StatutAlerte, StatutRappel, TypeSupport, TypeUrgence } from "@apsig/domain";
 
 // Formes renvoyées par apps/api (cf. auth.module.ts et CentraleService).
 export type Compte = {
@@ -24,6 +24,8 @@ export type AlerteResume = {
   support: { type: TypeSupport; libelle: string; code: string };
   lieu: string | null;
   position: Position | null;
+  // Localisation refusée ou impossible chez le témoin : à rappeler.
+  problemePosition: ProblemePosition | null;
   scoreFiabilite: number;
   rappel: StatutRappel;
   niveauEscalade: number;
@@ -68,7 +70,7 @@ export type AlerteDetail = AlerteResume & {
   priseEnChargeLe: string | null;
   surPlaceLe: string | null;
   issue: string | null;
-  temoin: (Position & { precisionM: number | null }) | null;
+  temoin: (Position & { precisionM: number | null; le: string | null }) | null;
   porteur: Personne | null;
   foyer: {
     libelle: string;
