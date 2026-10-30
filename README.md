@@ -18,8 +18,8 @@ L'API est le **seul** composant qui accède à la base et aux fournisseurs : les
 | Dossier | Contenu |
 |---|---|
 | `apps/api` | API NestJS (serveur) |
-| `apps/alerte` | Page d'alerte ouverte par le scan (`/s/<jeton>`) : menu d'urgences, envoi, position, suivi, annulation |
-| `apps/centrale` | Centrale des opérateurs : connexion, file des alertes avec sirène, fiche (foyer, santé, contacts, fiabilité), traitement jusqu'à la clôture |
+| `apps/alerte` | Page d'alerte ouverte par le scan (`/s/<jeton>`) : menu d'urgences, envoi, position suivie en continu avec aide vocale en cas de refus, suivi, annulation |
+| `apps/centrale` | Back-office : centrale d'alertes (file en temps réel, sirène, carte, fiche, répartition), supervision, abonnements (foyers, supports, impression des QR), administration (comptes, journal d'audit) |
 | `packages/domain` | Règles métier pures et testées : urgences, menus par support, codes, fiabilité, cycle de vie |
 | `packages/db` | Schéma Prisma, migrations, données de démonstration |
 | `docs/` | Cadrage ; `docs/references/` : affiche, schéma, maquette V8, vidéo |
@@ -41,9 +41,9 @@ pnpm --filter @apsig/alerte start        # http://localhost:3001 (ouvrir une URL
 pnpm --filter @apsig/centrale start      # http://localhost:3002
 ```
 
-Compte de la centrale (il n'y a pas d'inscription) : `pnpm --filter @apsig/api creer-compte --email moi@apsig.ci --nom "Prénom Nom" --role OPERATEUR`. Le mot de passe est généré et affiché une seule fois ; relancer la commande avec le seul `--email` en génère un nouveau et ferme les sessions ouvertes.
+Premier compte du back-office (il n'y a pas d'inscription) : `pnpm --filter @apsig/api creer-compte --email moi@apsig.ci --nom "Prénom Nom" --role SUPERADMIN`. Le mot de passe est généré et affiché une seule fois ; relancer la commande avec le seul `--email` en génère un nouveau et ferme les sessions ouvertes. Les comptes suivants se créent depuis la page Administration. La double authentification (application TOTP) est demandée à la première connexion ; `CENTRALE_2FA=facultatif` la rend facultative (développement uniquement).
 
-La géolocalisation du témoin n'est disponible qu'en HTTPS (ou sur `localhost`) : pour tester depuis un vrai téléphone, passer par un tunnel HTTPS.
+La géolocalisation du témoin n'est disponible qu'en HTTPS (ou sur `localhost`) : pour tester depuis un vrai téléphone, passer par un tunnel HTTPS. Le navigateur ne donne jamais la position sans l'accord du témoin : la page la redemande avec une aide en pictogrammes et à voix haute, et un refus est signalé à la centrale pour qu'elle rappelle.
 
 Tests : `pnpm test` (la base `apsig_test` est créée et migrée automatiquement).
 
@@ -53,27 +53,26 @@ Tests : `pnpm test` (la base `apsig_test` est créée et migrée automatiquement
 |---|---|---|
 | `GET` | `/sante` | État du serveur et de la base |
 | `GET` | `/public/supports/:jeton` | Ce que voit le témoin après le scan : type de support, quartier (support fixe), menu d'urgences |
-| `POST` | `/public/alertes` | Déclenche une alerte `{ jeton, type, appareilId?, position? }` → `numero`, `cleTemoin` |
+| `POST` | `/public/alertes` | Déclenche une alerte `{ jeton, type, appareilId?, position?, problemePosition? }` → `numero`, `cleTemoin` |
 | `GET` | `/public/alertes/:numero?cle=` | Suivi de l'alerte par le témoin |
-| `POST` | `/public/alertes/:numero/position` | Partage de la position `{ cle, position }` |
+| `POST` | `/public/alertes/:numero/position` | Partage de la position `{ cle, position }`, renvoyée à chaque déplacement |
+| `POST` | `/public/alertes/:numero/position/probleme` | `{ cle, probleme: REFUSEE \| INDISPONIBLE }` : la centrale doit rappeler le témoin |
 | `POST` | `/public/alertes/:numero/annuler` | Annulation `{ cle }` (tant qu'aucune unité n'est sur place) |
 
 Garanties : aucune donnée personnelle sur les routes publiques, jeton opaque révocable (410), limitation à 6 déclenchements par minute et par IP, regroupement des doublons, une urgence n'est jamais refusée pour un abonnement expiré.
 
 ## API de la centrale
 
-Connexion par e-mail et mot de passe (Better Auth, routes `/api/auth/*`, session de 12 h en cookie). Les routes `/centrale/*` sont réservées aux rôles `OPERATEUR`, `SUPERVISEUR` et `ADMIN` d'un compte actif.
+Connexion par e-mail et mot de passe puis code TOTP (Better Auth, routes `/api/auth/*`, session de 12 h en cookie, compte actif obligatoire). `GET /compte` renvoie le compte connecté et ses espaces ; chaque espace est un groupe de routes réservé à certains rôles :
 
-| Méthode | Route | Rôle |
+| Espace | Routes | Rôles |
 |---|---|---|
-| `GET` | `/centrale/moi` | Opérateur connecté |
-| `GET` | `/centrale/alertes` | File : alertes ouvertes (non prises en charge d'abord, puis priorité, puis ancienneté) et clôturées depuis 24 h |
-| `GET` | `/centrale/alertes/:numero` | Fiche : support, foyer, membres et santé, contacts, positions, fiabilité détaillée, journal, messages |
-| `POST` | `/centrale/alertes/:numero/statut` | `{ statut, issue? }` : prise en charge, en route, sur place, clôture ou annulation (issue obligatoire) |
-| `POST` | `/centrale/alertes/:numero/rappel` | `{ rappel }` : résultat de l'appel au titulaire, recalcule la fiabilité |
-| `POST` | `/centrale/alertes/:numero/notes` | `{ texte }` : note signée dans le journal |
+| Centrale | `/centrale/*` : flux temps réel (SSE), file, fiche, prise en charge, statut, rappel, notes, présence, alerte suivante | Opérateur, superviseur, administrateur, super-administrateur |
+| Supervision | `/supervision/*` : historique filtré, statistiques (délais médians, par type, par opérateur, par jour), équipe ; réattribution depuis la centrale | Superviseur, administrateur, super-administrateur |
+| Abonnements | `/abonnements/*` : foyers, membres, contacts, formules, paiements, supports et remplacement des QR | Conseiller abonnements, administrateur, super-administrateur |
+| Administration | `/administration/*` : comptes (création, rôle, désactivation, réinitialisation), journal d'audit | Administrateur (rôles inférieurs au sien), super-administrateur |
 
-Chaque changement de statut ou de rappel est inscrit au journal de l'alerte et dans la table `Audit`.
+Les alertes sont attribuées automatiquement aux opérateurs en service (rattrapage si l'opérateur ne la prend pas), sauf en mode crise où chacun prend la suivante, la plus urgente d'abord. Chaque action est inscrite au journal de l'alerte et dans la table `Audit`.
 
 ## Déploiement (Dokploy)
 
@@ -99,10 +98,10 @@ CENTRALE_URL=https://centrale.<domaine>
 BETTER_AUTH_SECRET=<openssl rand -base64 32>
 ```
 
-Sans `BETTER_AUTH_SECRET`, l'API démarre quand même (les alertes passent avant tout), mais les opérateurs sont déconnectés à chaque redémarrage. Sans `CENTRALE_URL` exacte, la connexion à la centrale est refusée.
+Sans `BETTER_AUTH_SECRET`, l'API démarre quand même (les alertes passent avant tout), mais les opérateurs sont déconnectés à chaque redémarrage. Sans `CENTRALE_URL` exacte, la connexion à la centrale est refusée. La double authentification est obligatoire : ne jamais définir `CENTRALE_2FA` en production.
 
 **Page d'alerte** : `NEXT_PUBLIC_API_URL=https://api.<domaine>` en **build argument** (elle est intégrée au build : la changer impose un redéploiement). En option, `API_INTERNAL_URL` en variable d'environnement pour que le serveur de la page joigne l'API par le réseau interne.
 
-**Centrale** : `CENTRALE_API_URL=https://api.<domaine>` en **build argument** (adresse de l'API vue par le serveur de la centrale, qui lui relaie `/api/auth` et `/api/centrale`). Premier compte, depuis le terminal Dokploy du conteneur de l'API : `node apps/api/dist/auth/creer-compte.js --email … --nom "…" --role ADMIN`.
+**Centrale** : `CENTRALE_API_URL=https://api.<domaine>` en **build argument** (adresse de l'API vue par le serveur de la centrale, qui lui relaie `/api/auth`, `/api/compte` et un `/api/<espace>` par espace). Premier compte, depuis le terminal Dokploy du conteneur de l'API : `node apps/api/dist/auth/creer-compte.js --email … --nom "…" --role SUPERADMIN`.
 
 Vérification : `https://api.<domaine>/sante` doit répondre `{ "statut": "ok", "base": "ok", … }`.
