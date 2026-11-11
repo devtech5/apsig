@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 72" role="img" aria-label="APSIG">
+  <path d="M32 2 60 12v22c0 18-12.6 30-28 36C16.6 64 4 52 4 34V12Z" fill="#C8102E" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M32 9.5 53 17v17c0 13.6-9.3 23.1-21 28.3C20.3 57.1 11 47.6 11 34V17Z" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.5"/>
+  <path d="m32 19 4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L32 42.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5Z" fill="#fff"/>
+</svg>

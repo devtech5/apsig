@@ -6,4 +6,5 @@ export * from "./alerte.ts";
 export * from "./repartition.ts";
 export * from "./roles.ts";
 export * from "./abonnements.ts";
+export * from "./forfaits.ts";
 export * from "./unites.ts";

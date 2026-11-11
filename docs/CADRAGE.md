@@ -77,16 +77,23 @@ Règles :
 | Présentation | Grande plaque aluminium, anti-UV, rivetée ; **uniquement le code plaque et le QR** | Petit format plexi blanc/argent, accent vert « Urgence santé — scannez ici » |
 | Fiabilité | Contrôle distance GPS ↔ adresse, limitation de débit, rappel du témoin | Bonus de fiabilité (le scan vient de l'intérieur) |
 
-## 5. Formules (pilote Daloa)
+## 5. Forfaits
 
-Modèle **achat + abonnement** : le prix d'achat paie les supports et la mise en service ; un abonnement mensuel finance ensuite la centrale 24/7.
+Tarif de lancement fixé le 11/11/2026 : **un forfait unique**. L'**abonnement** de **10 000 F** est payé à l'entrée, **en une seule fois, et n'est pas remboursable** (supports et mise en service) ; la **mensualité** finance ensuite la centrale 24/7 et dépend du client.
 
-| Formule | Achat | Contenu | Abonnement mensuel |
-|---|---|---|---|
-| Enfant | 3 000 F | Bracelet QR + enregistrement | à fixer |
-| Maison | 7 500 F | Plaque + accès au service | à fixer |
-| Famille complète | 15 000 F | Plaque + QR intérieur + bracelet + carte voyageur + 2 mois de service | à fixer |
-| **Sécurité +** | à fixer | Formule à part : équipe d'intervention APSIG engagée en premier sur une agression | à fixer |
+| Client | Abonnement | Mensualité |
+|---|---|---|
+| **Particulier** | 10 000 F | 2 000 F/mois |
+| **Famille** | 10 000 F | 5 000 F/mois |
+| **Entreprise et autres** (ONG, mutuelle…) | 10 000 F | 10 000 F/mois |
+
+Le client pourra ajouter des **options** plus tard, en supplément du forfait. La commission du mandataire reste à 1 000 F par plaque posée.
+
+Source unique dans le code : `packages/domain/src/forfaits.ts` (trois formules `UNIQUE_PARTICULIER`, `UNIQUE_FAMILLE`, `UNIQUE_ENTREPRISE`).
+
+Le **premier mois est compris** dans l'abonnement ; la mensualité court dès le deuxième mois. **Provisoire** : supports fournis = plaque + QR intérieur.
+
+Les inscriptions en ligne (`code-secours.apsig.online`, `apps/inscription`) déposent une demande sans paiement ; un conseiller rappelle.
 
 Un abonnement expiré ne bloque jamais une urgence.
 
@@ -110,10 +117,17 @@ Tranchées le 27/10/2026 :
 - [x] **Numéros d'urgence** : aucun numéro imprimé sur les supports ; la plaque extérieure porte seulement le code et le QR.
 - [x] **Code plaque** : format adaptatif (§4).
 - [x] **Formules** : achat + abonnement mensuel (§5).
-- [x] **Premium** : formule à part « Sécurité + » avec intervention APSIG.
+
+Tranchées le 11/11/2026 :
+- [x] **Forfait unique de lancement** : 10 000 F à l'entrée, premier mois compris ; mensualité de 2 000 F (particulier), 5 000 F (famille), 10 000 F (entreprise et autres organisations) ; options ajoutées plus tard (§5). Remplace la grille Bronze / Gold / Premium du matin même, les formules Enfant, Maison, Famille complète et Sécurité +, ainsi que la grille Standard / Premium des documents terrain du 04/11.
+- [x] **Abonnement** : payé en une seule fois, non remboursable (pas d'avance ni de paiement fractionné).
+- [x] **Mandataires** : indépendants, non salariés d'APSIG ; commission due à la pose validée de la plaque.
 
 Ouvertes :
-- [ ] **Tarifs** : abonnement mensuel de chaque formule ; prix d'achat de « Sécurité + ».
+- [ ] **Contenu du forfait unique** : supports fournis, nombre de membres ; liste et prix des options ; quelle option engage l'équipe d'intervention APSIG sur une agression (ex-« Sécurité + »).
+- [ ] **Numéros sur la plaque** : les maquettes du 06/11 impriment Police 111, GSPM 180 et le numéro APSIG, contre la décision du 27/10.
+- [ ] **Code plaque** : les maquettes portent `PB-GONZA-453`, hors du format adaptatif (§4).
+- [ ] **Zone pilote** : Daloa, Gonzagueville (Port-Bouët) et Anyama Belleville apparaissent selon les documents.
 - [ ] **Présentation du QR intérieur** : contenu exact imprimé (code `INT-…`, mention « Urgence santé » ?).
 - [ ] **Conventions** avec Police, GSPM, SAMU pour la transmission automatique.
 - [ ] **Fournisseurs** : agrégateur SMS/USSD, agrégateur Mobile Money, hébergeur.

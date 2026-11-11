@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-brand: #1e3a6e;
+  --color-brand-clair: #dbe6f7;
+  --color-fond: #eef2f7;
+  --color-encre: #0f1b33;
+  --color-attenue: #5a6680;
+  --color-ligne: #d5dce8;
+  --color-succes: #15803d;
+  --color-succes-fond: #dcfce7;
+  --color-erreur: #b91c1c;
+  --color-erreur-fond: #fee2e2;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-fond);
+  color: var(--color-encre);
+}

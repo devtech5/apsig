@@ -202,13 +202,40 @@ model Pose {
   poseLe    DateTime @default(now())
 }
 
+// ─── Inscriptions en ligne ─────────────────────────────────────────────────
+
+enum StatutDemande {
+  NOUVELLE // reçue depuis code-secours.apsig.online, à rappeler
+  TRAITEE // un conseiller a rappelé le demandeur
+}
+
+// Demande d'inscription déposée par le visiteur, sans compte ni paiement : un conseiller le rappelle,
+// puis crée le foyer et l'abonnement depuis le back-office. Aucune donnée de santé n'est collectée ici.
+model DemandeInscription {
+  id          String        @id @default(cuid())
+  creeLe      DateTime      @default(now())
+  statut      StatutDemande @default(NOUVELLE)
+  cible       String // PARTICULIER, FAMILLE, ENTREPRISE (@apsig/domain) : fixe la mensualité
+  prenom      String
+  nom         String
+  telephone   String
+  email       String?
+  ville       String
+  quartier    String
+  adresse     String?
+  message     String?
+  traiteeLe   DateTime?
+
+  @@index([statut, creeLe])
+}
+
 // ─── Formules, abonnements, paiements ─────────────────────────────────────
 
-// Achat + abonnement : prixFcfa paie les supports et la mise en service,
-// puis prixMensuelFcfa finance la centrale 24/7 à l'issue des mois inclus.
+// Une formule par forfait et par cible (grille dans @apsig/domain, forfaits.ts).
+// prixFcfa : abonnement payé à l'entrée (supports, mise en service) ; prixMensuelFcfa : mensualité.
 model Formule {
   id           String          @id @default(cuid())
-  code         String          @unique // ENFANT, MAISON, FAMILLE, SECURITE_PLUS
+  code         String          @unique // BRONZE_PARTICULIER … PREMIUM_ENTREPRISE
   nom          String
   prixFcfa     Int
   prixMensuelFcfa Int?         // null tant que le tarif n'est pas fixé

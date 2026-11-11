@@ -108,6 +108,7 @@ export function ChampsSouscription({ formules, facultative = false }: { formules
             Fournit : {formule.composition.map((c) => `${c.quantite} ${SUPPORTS[c.type].libelle.toLowerCase()}`).join(", ")} (seuls les supports manquants sont créés).
             {formule.prixMensuelFcfa != null && ` Puis ${fcfa(formule.prixMensuelFcfa)} par mois.`}
           </p>
+          <p className="text-xs font-semibold">Abonnement payé en une seule fois, non remboursable.</p>
           <div className="flex flex-wrap gap-4 text-sm">
             <label className="flex items-center gap-2">
               <input type="checkbox" name="essai" /> Période d'essai

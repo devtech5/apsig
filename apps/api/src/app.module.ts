@@ -7,6 +7,7 @@ import { AuthModule } from "./auth/auth.module.ts";
 import { CentraleModule } from "./centrale/centrale.module.ts";
 import { ClientModule } from "./client/client.controller.ts";
 import { config } from "./config.ts";
+import { InscriptionsModule } from "./inscriptions/inscriptions.controller.ts";
 import { FluxModule } from "./flux/flux.module.ts";
 import { NotificationsModule } from "./notifications/notifications.service.ts";
 import { PoseModule } from "./pose/pose.controller.ts";
@@ -23,6 +24,7 @@ import { TerrainModule } from "./terrain/terrain.controller.ts";
     NotificationsModule,
     AuthModule,
     AlertesModule,
+    InscriptionsModule,
     CentraleModule,
     AbonnementsModule,
     SupervisionModule,

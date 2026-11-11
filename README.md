@@ -20,6 +20,7 @@ L'API est le **seul** composant qui accède à la base et aux fournisseurs : les
 |---|---|
 | `apps/api` | API NestJS (serveur) |
 | `apps/alerte` | Page d'alerte ouverte par le scan (`/s/<jeton>`) : menu d'urgences, envoi, position suivie en continu avec aide vocale en cas de refus, suivi, annulation |
+| `apps/inscription` | Inscriptions en ligne (`code-secours.apsig.online`) : forfait unique, type de client et coordonnées, sans compte ni paiement ; la demande est enregistrée par l'API (`POST /public/inscriptions`) et un conseiller rappelle |
 | `apps/centrale` | Back-office : centrale d'alertes (file en temps réel, sirène, carte, fiche, répartition), supervision, abonnements (foyers, supports, impression des QR), administration (comptes, journal d'audit) |
 | `apps/mobile` | Application APSIG pour Android et iPhone (Expo, React Native) : SOS de l'abonné et suivi de son foyer, pose des QR par les agents (GPS = adresse vérifiée), missions des unités terrain, scan sans compte pour un témoin |
 | `packages/domain` | Règles métier pures et testées : urgences, menus par support, codes, fiabilité, cycle de vie |
@@ -41,6 +42,7 @@ pnpm build
 pnpm --filter @apsig/api start           # http://localhost:4000
 pnpm --filter @apsig/alerte start        # http://localhost:3001 (ouvrir une URL de QR affichée par le seed)
 pnpm --filter @apsig/centrale start      # http://localhost:3002
+pnpm --filter @apsig/inscription start   # http://localhost:3003 (son adresse doit figurer dans CORS_ORIGINS)
 ```
 
 Premier compte du back-office (il n'y a pas d'inscription) : `pnpm --filter @apsig/api creer-compte --email moi@apsig.ci --nom "Prénom Nom" --role SUPERADMIN`. Le mot de passe est généré et affiché une seule fois ; relancer la commande avec le seul `--email` en génère un nouveau et ferme les sessions ouvertes. Les comptes suivants se créent depuis la page Administration. La double authentification (application TOTP) est demandée à la première connexion ; `CENTRALE_2FA=facultatif` la rend facultative (développement uniquement).

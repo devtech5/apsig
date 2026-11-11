@@ -62,7 +62,7 @@ export class AbonnementsService {
   async referentiel() {
     const [villes, formules] = await Promise.all([
       this.db.ville.findMany({ orderBy: { nom: "asc" }, include: { quartiers: { orderBy: { nom: "asc" }, include: { commune: true } } } }),
-      this.db.formule.findMany({ where: { actif: true }, orderBy: { prixFcfa: "asc" }, include: { composition: true } }),
+      this.db.formule.findMany({ where: { actif: true }, orderBy: [{ prixFcfa: "asc" }, { prixMensuelFcfa: "asc" }, { code: "asc" }], include: { composition: true } }),
     ]);
     return {
       villes: villes.map((v) => ({

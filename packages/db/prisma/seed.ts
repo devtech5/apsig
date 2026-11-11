@@ -2,7 +2,7 @@
 // Coordonnées des quartiers de Daloa approximatives, à corriger sur le terrain.
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { codeSupport, genererJeton, urlAlerte, type TypeSupport } from "@apsig/domain";
+import { FORMULES, FORMULES_RETIREES, codeSupport, genererJeton, urlAlerte, type TypeSupport } from "@apsig/domain";
 import { createPrismaClient } from "../src/index.ts";
 
 // En conteneur, pas de .env : les variables viennent de l'environnement.
@@ -41,21 +41,17 @@ async function main() {
     create: { code: "NIANGON", nom: "Niangon", villeId: abidjan.id, communeId: yop.id, lat: 5.3335, lng: -4.0935 },
   });
 
-  // Formules (prix d'achat de l'affiche ; abonnements mensuels à fixer)
-  const formules = [
-    { code: "ENFANT", nom: "Formule Enfant", prixFcfa: 3000, moisInclus: 0, composition: [["BRACELET", 1]] },
-    { code: "MAISON", nom: "Formule Maison", prixFcfa: 7500, moisInclus: 0, composition: [["PORTAIL", 1]] },
-    { code: "FAMILLE", nom: "Formule Famille complète", prixFcfa: 15000, moisInclus: 2, composition: [["PORTAIL", 1], ["INTERIEUR", 1], ["BRACELET", 1], ["CARTE_VOYAGEUR", 1]] },
-    // Prix non fixé : désactivée tant que le tarif n'est pas décidé.
-    { code: "SECURITE_PLUS", nom: "Formule Sécurité +", prixFcfa: 0, moisInclus: 0, intervention: true, actif: false, composition: [["PORTAIL", 1], ["INTERIEUR", 1]] },
-  ] as const;
-  for (const { composition, ...f } of formules) {
+  // Formules : forfait unique, une formule par type de client (@apsig/domain).
+  // Relancer le seed réaligne les prix ; la composition n'est posée qu'à la création.
+  for (const f of FORMULES) {
+    const prix = { nom: f.nom, prixFcfa: f.abonnementFcfa, prixMensuelFcfa: f.mensualiteFcfa, moisInclus: f.moisInclus, actif: true };
     await prisma.formule.upsert({
       where: { code: f.code },
-      update: {},
-      create: { ...f, composition: { create: composition.map(([type, quantite]) => ({ type, quantite })) } },
+      update: prix,
+      create: { code: f.code, ...prix, composition: { create: f.supports.map(([type, quantite]) => ({ type, quantite })) } },
     });
   }
+  await prisma.formule.updateMany({ where: { code: { in: [...FORMULES_RETIREES] } }, data: { actif: false } });
 
   // Partenaires (numéros publics ; partenaires privés fictifs)
   if ((await prisma.partenaire.count()) === 0) {
@@ -79,11 +75,11 @@ async function main() {
     await prisma.utilisateur.upsert({ where: { email: u.email }, update: {}, create: u });
   }
 
-  // Foyer fictif équipé de la Formule Famille
+  // Foyer fictif abonné au forfait unique — Famille
   const existant = await prisma.support.findUnique({ where: { code: "DAL-LOBIA-053" } });
   if (!existant) {
     const lobia = await prisma.quartier.findUniqueOrThrow({ where: { villeId_code: { villeId: daloa.id, code: "LOBIA" } } });
-    const famille = await prisma.formule.findUniqueOrThrow({ where: { code: "FAMILLE" } });
+    const famille = await prisma.formule.findUniqueOrThrow({ where: { code: "UNIQUE_FAMILLE" } });
     const now = new Date();
     const foyer = await prisma.foyer.create({
       data: {
