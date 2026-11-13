@@ -41,7 +41,7 @@ describe("Inscription en deux temps", () => {
   it("étape 1 puis étape 2 : recensement payé, puis pose par code plaque avec GPS à 5 m et photos", async () => {
     const { agent } = await connecter(app, db, "CHEF_EQUIPE");
     const ref = await agent.get("/pose/referentiel").expect(200);
-    expect(ref.body.some((v: { quartiers: { id: string }[] }) => v.quartiers.some((q) => q.id === quartierId))).toBe(true);
+    expect(ref.body.find((v: { nom: string }) => v.nom === "Ville de test").quartiers).toContainEqual({ nom: "Centre", commune: null });
 
     const r = await agent
       .post("/pose/recensements")
@@ -88,7 +88,8 @@ describe("Inscription en deux temps", () => {
     const sansRccm = await agent.post("/pose/recensements").send(entreprise).expect(400);
     expect(sansRccm.body.erreurs.map((e: { champ: string }) => e.champ)).toContain("rccm");
     const r = await agent.post("/pose/recensements").send({ ...entreprise, rccm: "ci-abj-2026-b-12345" }).expect(201);
-    expect(r.body).toMatchObject({ rccm: "CI-ABJ-2026-B-12345", paye: false, cible: null });
+    // Le type de client est conservé au recensement, même sans paiement.
+    expect(r.body).toMatchObject({ rccm: "CI-ABJ-2026-B-12345", paye: false, cible: "ENTREPRISE" });
     expect(r.body.code).toMatch(/^TST-CENTRE-\d{3}$/);
     await agent.post("/pose/recensements").send({ ...client(tel("05")), adresse: "ici", paiement: null }).expect(400);
   });

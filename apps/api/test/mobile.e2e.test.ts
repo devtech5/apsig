@@ -31,12 +31,22 @@ afterAll(async () => {
 
 describe("Pose des supports", () => {
   it("le GPS relevé devant le QR devient l'adresse vérifiée du foyer", async () => {
-    const { foyer, jetons } = await creerFoyer(db, quartierId);
+    // Commune propre au test : la tournée du poseur ne contient que ce foyer, quelle que soit la base conservée.
+    const { villeId } = await db.quartier.findUniqueOrThrow({ where: { id: quartierId } });
+    const suffixe = genererJeton(6).toUpperCase();
+    const commune = await db.commune.create({ data: { code: `C${suffixe}`, nom: `Commune ${suffixe}`, villeId } });
+    const quartier = await db.quartier.create({ data: { code: `Q${suffixe}`, nom: `Quartier ${suffixe}`, villeId, communeId: commune.id } });
+    const { foyer, jetons } = await creerFoyer(db, quartier.id);
     await db.foyer.update({ where: { id: foyer.id }, data: { adresseVerifiee: false } });
     const { agent, utilisateur } = await connecter(app, db, "AGENT");
 
+    // Sans zone attribuée, le poseur ne voit aucun client.
+    expect((await agent.get("/pose/a-poser").expect(200)).body).toEqual({ zones: [], clients: [] });
+    await db.zonePoseur.create({ data: { utilisateurId: utilisateur.id, villeId, communeId: commune.id } });
     const tournee = await agent.get("/pose/a-poser").expect(200);
-    expect(tournee.body.some((s: { foyer: { libelle: string } | null }) => s.foyer?.libelle === foyer.libelle)).toBe(true);
+    expect(tournee.body.zones).toEqual([{ ville: "Ville de test", commune: commune.nom }]);
+    expect(tournee.body.clients).toHaveLength(1);
+    expect(tournee.body.clients[0]).toMatchObject({ client: "Awa Testeur", foyer: { libelle: foyer.libelle, commune: commune.nom } });
 
     const avant = await agent.get(`/pose/supports/${jetons.PORTAIL}`).expect(200);
     expect(avant.body).toMatchObject({ fixe: true, pose: null, foyer: { adresseVerifiee: false } });
