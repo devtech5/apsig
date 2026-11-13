@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { cle, ListeSaisie } from "@/components/ListeSaisie";
 import { QrCode } from "@/components/QrCode";
 import { Bouton, Carte, Chargement, Ecran, Erreur, Texte, styles as ui } from "@/components/ui";
 import { appelPersonnel } from "@/lib/personnel";
 import { COULEURS } from "@/lib/theme";
 import type { Recense } from "./index";
 
-type Ville = { id: string; nom: string; communes: { id: string; nom: string }[]; quartiers: { id: string; nom: string; communeId: string | null }[] };
+// Listes de l'API : toutes les villes de Côte d'Ivoire, leurs communes et leurs quartiers connus (par nom).
+type Ville = { nom: string; communes: string[]; quartiers: { nom: string; commune: string | null }[] };
 type Cible = "PARTICULIER" | "FAMILLE" | "ENTREPRISE";
 
 // Mêmes valeurs que @apsig/domain (forfaits.ts, abonnements.ts) : l'application mobile n'importe pas le paquet domaine.
@@ -24,6 +26,7 @@ const MOYENS = [
   { code: "WAVE", libelle: "Wave" },
 ] as const;
 const PRIX = "10 000 F";
+const francs = (n: number) => `${n.toLocaleString("fr-FR").replace(/\u202f/g, " ")} F`;
 const TELEPHONE = /^\+?[0-9 .-]{8,20}$/;
 
 function Choix<T extends string>({ options, valeur, onChange }: { options: readonly { code: T; libelle: string }[]; valeur: T | null; onChange: (v: T) => void }) {
@@ -64,38 +67,37 @@ export default function NouveauRecensement() {
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
   const [telephone2, setTelephone2] = useState("");
-  const [villeId, setVilleId] = useState<string | null>(null);
-  const [communeId, setCommuneId] = useState<string | null>(null);
-  const [quartierId, setQuartierId] = useState<string | null>(null);
+  const [ville, setVille] = useState("");
+  const [commune, setCommune] = useState("");
+  const [quartier, setQuartier] = useState("");
   const [adresse, setAdresse] = useState("");
-  const [paye, setPaye] = useState(true);
+  const [encaissement, setEncaissement] = useState<"total" | "acompte" | "aucun">("total");
+  const [montant, setMontant] = useState("");
   const [moyen, setMoyen] = useState<(typeof MOYENS)[number]["code"]>("ESPECES");
   const [reference, setReference] = useState("");
 
   useEffect(() => {
-    void appelPersonnel<Ville[]>("/pose/referentiel").then(
-      (v) => {
-        setVilles(v);
-        if (v.length === 1) setVilleId(v[0]!.id);
-      },
-      (e: Error) => setErreur(e.message),
-    );
+    void appelPersonnel<Ville[]>("/pose/referentiel").then(setVilles, (e: Error) => setErreur(e.message));
   }, []);
 
   if (!villes && !erreur) return <Chargement />;
 
-  const ville = villes?.find((v) => v.id === villeId);
-  const avecCommunes = Boolean(ville?.communes.length);
-  const quartiers = ville?.quartiers.filter((q) => !avecCommunes || q.communeId === communeId) ?? [];
+  const villeConnue = villes?.find((v) => cle(v.nom) === cle(ville));
+  const communes = villeConnue?.communes ?? [];
+  const quartiers = (villeConnue?.quartiers ?? []).filter((q) => !commune.trim() || !q.commune || cle(q.commune) === cle(commune));
+  const acompte = Number(montant);
   const complet =
     (cible !== "ENTREPRISE" || rccm.trim().length >= 3) &&
     prenom.trim() &&
     nom.trim() &&
     TELEPHONE.test(telephone.trim()) &&
     (!telephone2.trim() || TELEPHONE.test(telephone2.trim())) &&
-    quartierId &&
+    ville.trim() &&
+    (communes.length === 0 || commune.trim()) &&
+    quartier.trim() &&
     adresse.trim().length >= 5 &&
-    (!paye || moyen === "ESPECES" || reference.trim().length >= 3);
+    (encaissement !== "acompte" || (Number.isInteger(acompte) && acompte >= 100 && acompte < 10_000)) &&
+    (encaissement === "aucun" || moyen === "ESPECES" || reference.trim().length >= 3);
 
   async function enregistrer() {
     if (!complet || envoi) return;
@@ -110,9 +112,12 @@ export default function NouveauRecensement() {
           nom,
           telephone,
           telephone2,
-          quartierId,
+          lieu: { ville: ville.trim(), commune: commune.trim() || null, quartier: quartier.trim() },
           adresse,
-          paiement: paye ? { operateur: moyen, ...(reference.trim() && { reference: reference.trim() }) } : null,
+          paiement:
+            encaissement === "aucun"
+              ? null
+              : { operateur: moyen, ...(encaissement === "acompte" && { montantFcfa: acompte }), ...(reference.trim() && { reference: reference.trim() }) },
         },
       });
       setFait(r);
@@ -133,7 +138,9 @@ export default function NouveauRecensement() {
           </Text>
           <Texte gras>{fait.client}</Texte>
           <Texte attenue>{fait.lieu}</Texte>
-          <Text style={[styles.etat, fait.paye ? styles.ok : styles.attente]}>{fait.paye ? `${PRIX} encaissés` : "Paiement à encaisser"}</Text>
+          <Text style={[styles.etat, fait.paye ? styles.ok : styles.attente]}>
+            {fait.paye ? `${PRIX} encaissés` : fait.encaisseFcfa > 0 ? `Acompte ${francs(fait.encaisseFcfa)} · reste ${francs(fait.resteFcfa)}` : "Paiement à encaisser"}
+          </Text>
           <Texte attenue style={{ textAlign: "center" }}>
             Notez ce code au client. Il sera gravé sur sa plaque, posée lors du second passage avec relevé GPS.
           </Texte>
@@ -183,39 +190,31 @@ export default function NouveauRecensement() {
 
       <Carte>
         <Text style={styles.titre}>Lieu</Text>
-        <Text style={ui.libelle}>Ville</Text>
-        <Choix
-          options={(villes ?? []).map((v) => ({ code: v.id, libelle: v.nom }))}
-          valeur={villeId}
-          onChange={(v) => {
-            setVilleId(v);
-            setCommuneId(null);
-            setQuartierId(null);
-          }}
-        />
-        {avecCommunes && (
-          <>
-            <Text style={ui.libelle}>Commune</Text>
-            <Choix
-              options={ville!.communes.map((c) => ({ code: c.id, libelle: c.nom }))}
-              valeur={communeId}
-              onChange={(c) => {
-                setCommuneId(c);
-                setQuartierId(null);
-              }}
-            />
-          </>
-        )}
-        {ville && (!avecCommunes || communeId) && (
-          <>
-            <Text style={ui.libelle}>Quartier</Text>
-            {quartiers.length === 0 ? (
-              <Texte attenue>Aucun quartier enregistré ici : demandez à la centrale de l'ajouter.</Texte>
-            ) : (
-              <Choix options={quartiers.map((q) => ({ code: q.id, libelle: q.nom }))} valeur={quartierId} onChange={setQuartierId} />
-            )}
-          </>
-        )}
+        <View style={{ flexDirection: "row", gap: 10, zIndex: 2 }}>
+          <ListeSaisie
+            libelle="Ville"
+            valeur={ville}
+            options={(villes ?? []).map((v) => v.nom)}
+            onChange={(v) => {
+              setVille(v);
+              setCommune("");
+              setQuartier("");
+            }}
+            ajout="elle sera ajoutée"
+          />
+          <ListeSaisie
+            libelle={communes.length ? "Commune" : "Commune (facult.)"}
+            valeur={commune}
+            options={communes}
+            onChange={(c) => {
+              setCommune(c);
+              setQuartier("");
+            }}
+            placeholder={communes.length ? "Choisir ou saisir" : "—"}
+            ajout="elle sera ajoutée"
+          />
+        </View>
+        <ListeSaisie libelle="Quartier" valeur={quartier} options={quartiers.map((q) => q.nom)} onChange={setQuartier} />
         <Champ
           libelle="Adresse ou repère"
           aide="Soyez le plus précis possible : c'est ce qui permet de retrouver la maison pour poser la plaque."
@@ -231,13 +230,25 @@ export default function NouveauRecensement() {
         <Text style={styles.titre}>Encaissement · {PRIX}</Text>
         <Choix
           options={[
-            { code: "oui", libelle: "Payé" },
-            { code: "non", libelle: "Pas encore payé" },
+            { code: "total", libelle: `Payé (${PRIX})` },
+            { code: "acompte", libelle: "Acompte / avance" },
+            { code: "aucun", libelle: "Pas encore payé" },
           ]}
-          valeur={paye ? "oui" : "non"}
-          onChange={(v) => setPaye(v === "oui")}
+          valeur={encaissement}
+          onChange={setEncaissement}
         />
-        {paye && (
+        {encaissement === "acompte" && (
+          <Champ
+            libelle="Montant versé (F CFA)"
+            aide={`Le solde sera à payer avant l'ouverture de l'abonnement (total ${PRIX}).`}
+            value={montant}
+            onChangeText={(t) => setMontant(t.replace(/\D/g, ""))}
+            keyboardType="number-pad"
+            placeholder="5000"
+            maxLength={4}
+          />
+        )}
+        {encaissement !== "aucun" && (
           <>
             <Choix options={MOYENS} valeur={moyen} onChange={setMoyen} />
             {moyen !== "ESPECES" && <Champ libelle="Référence de la transaction" value={reference} onChangeText={setReference} autoCapitalize="characters" maxLength={64} />}

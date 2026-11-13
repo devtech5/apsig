@@ -32,7 +32,8 @@ export class EquipeService {
     const ids = membres.map((m) => m.id);
     const [recenses, payes, posees, poses] = await Promise.all([
       this.db.foyer.groupBy({ by: ["recenseParId"], where: { recenseParId: { in: ids } }, _count: true }),
-      this.db.foyer.groupBy({ by: ["recenseParId"], where: { recenseParId: { in: ids }, paiements: { some: { statut: "REUSSI" } } }, _count: true }),
+      // Payés : forfait soldé (abonnement ouvert) ; un acompte ne suffit pas.
+      this.db.foyer.groupBy({ by: ["recenseParId"], where: { recenseParId: { in: ids }, abonnements: { some: {} } }, _count: true }),
       // Plaques posées chez les clients du recenseur : la commission est due à la pose validée.
       this.db.foyer.groupBy({ by: ["recenseParId"], where: { recenseParId: { in: ids }, supports: { some: { type: "PORTAIL", pose: { isNot: null } } } }, _count: true }),
       this.db.pose.groupBy({ by: ["agentId"], where: { agentId: { in: ids } }, _count: true }),
@@ -50,7 +51,7 @@ export class EquipeService {
         recensePar: { select: { nom: true } },
         quartier: { include: { ville: true, commune: true } },
         supports: { where: { type: "PORTAIL" }, include: { pose: { select: { id: true } } }, take: 1 },
-        paiements: { where: { statut: "REUSSI" }, select: { id: true }, take: 1 },
+        abonnements: { select: { id: true }, take: 1 },
       },
     });
     return {
@@ -73,7 +74,7 @@ export class EquipeService {
         client: f.libelle,
         lieu: [f.quartier.nom, f.quartier.commune?.nom, f.quartier.ville.nom].filter(Boolean).join(", "),
         recenseur: f.recensePar?.nom ?? null,
-        paye: f.paiements.length > 0,
+        paye: f.abonnements.length > 0,
         posee: Boolean(f.supports[0]?.pose),
         creeLe: f.creeLe,
       })),

@@ -8,3 +8,4 @@ export * from "./roles.ts";
 export * from "./abonnements.ts";
 export * from "./forfaits.ts";
 export * from "./unites.ts";
+export * from "./lieux.ts";

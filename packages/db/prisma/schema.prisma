@@ -46,8 +46,9 @@ model Quartier {
   ville     Ville    @relation(fields: [villeId], references: [id])
   communeId String?
   commune   Commune? @relation(fields: [communeId], references: [id])
-  lat       Float
-  lng       Float
+  // Centre approximatif ; vide pour un quartier ajouté au recensement, renseigné à la première pose de plaque.
+  lat       Float?
+  lng       Float?
   foyers    Foyer[]
 
   // Code unique dans la ville, même à Abidjan (deux communes ne réutilisent pas un code).
@@ -70,6 +71,8 @@ model Foyer {
   creeLe          DateTime        @default(now())
   // Entreprise ou organisation (ONG, mutuelle…) : numéro du registre du commerce (RCCM).
   rccm            String?
+  // Type de client déclaré au recensement (PARTICULIER, FAMILLE, ENTREPRISE) : fixe la mensualité.
+  cible           String?
   // Agent qui a recensé le client sur le terrain (inscription en deux temps : recensement, puis pose).
   recenseParId    String?
   recensePar      Utilisateur?    @relation("Recensement", fields: [recenseParId], references: [id])

@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import {
   CIBLES,
+  cleLieu,
   FORFAIT_UNIQUE,
   LIBELLES_CIBLE_DETAILLES,
   LIBELLES_MOYEN_PAIEMENT,
@@ -18,7 +19,8 @@ import { Icone } from "@/components/Icone";
 import { appelApi } from "@/lib/api";
 import { dateHeure } from "@/lib/format";
 
-type Ville = { id: string; nom: string; communes: { id: string; nom: string }[]; quartiers: { id: string; nom: string; communeId: string | null }[] };
+// Listes de l'API : toutes les villes de Côte d'Ivoire, leurs communes et leurs quartiers connus (par nom).
+type Ville = { nom: string; communes: string[]; quartiers: { nom: string; commune: string | null }[] };
 type Recense = {
   id: string;
   code: string | null;
@@ -30,10 +32,15 @@ type Recense = {
   lieu: string;
   cible: Cible | null;
   paye: boolean;
+  encaisseFcfa: number;
+  resteFcfa: number;
   posee: boolean;
   creeLe: string;
 };
 
+const cle = (s: string) => cleLieu(s);
+const etatPaiement = (r: { paye: boolean; encaisseFcfa: number; resteFcfa: number }) =>
+  r.paye ? "Payé" : r.encaisseFcfa > 0 ? `Acompte ${fcfa(r.encaisseFcfa)} · reste ${fcfa(r.resteFcfa)}` : "Non payé";
 const fcfa = (n: number) => `${n.toLocaleString("fr-FR").replace(/ /g, " ")} F`;
 const PRIX = fcfa(FORFAIT_UNIQUE.abonnementFcfa);
 // Espèces en premier : c'est le cas le plus courant sur le terrain.
@@ -85,7 +92,7 @@ export default function PageRecensement() {
           <p className="font-bold">{fait.client}</p>
           <p className="text-sm text-attenue">{fait.lieu}</p>
           <p className={`rounded-lg px-3 py-1 text-sm font-bold ${fait.paye ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>
-            {fait.paye ? `${PRIX} encaissés` : "Paiement à encaisser"}
+            {fait.paye ? `${PRIX} encaissés` : etatPaiement(fait)}
           </p>
           <p className="text-sm text-attenue">Notez ce code au client. Il sera gravé sur sa plaque, posée lors du second passage avec relevé GPS.</p>
         </section>
@@ -149,7 +156,7 @@ export default function PageRecensement() {
                   {r.rccm && ` · RCCM ${r.rccm}`} · {dateHeure(r.creeLe)}
                 </p>
                 <p className="flex flex-wrap gap-2 text-xs font-bold">
-                  <span className={`rounded px-2 py-0.5 ${r.paye ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>{r.paye ? "Payé" : "Non payé"}</span>
+                  <span className={`rounded px-2 py-0.5 ${r.paye ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>{etatPaiement(r)}</span>
                   <span className={`rounded px-2 py-0.5 ${r.posee ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>{r.posee ? "Plaque posée" : "Plaque à poser"}</span>
                   {r.cible && <span className="rounded bg-fond px-2 py-0.5 text-encre">{LIBELLES_CIBLE_DETAILLES[r.cible]}</span>}
                 </p>
@@ -164,22 +171,24 @@ export default function PageRecensement() {
 
 function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () => void; onFait: (r: Recense) => void }) {
   const [cible, setCible] = useState<Cible>("PARTICULIER");
-  const [villeId, setVilleId] = useState<string | null>(villes.length === 1 ? villes[0]!.id : null);
-  const [communeId, setCommuneId] = useState<string | null>(null);
-  const [quartierId, setQuartierId] = useState<string | null>(null);
-  const [paye, setPaye] = useState(true);
+  const [ville, setVille] = useState("");
+  const [commune, setCommune] = useState("");
+  const [quartier, setQuartier] = useState("");
+  const [encaissement, setEncaissement] = useState<"total" | "acompte" | "aucun">("total");
   const [moyen, setMoyen] = useState<MoyenPaiement>("ESPECES");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
-  const ville = villes.find((v) => v.id === villeId);
-  const avecCommunes = Boolean(ville?.communes.length);
-  const quartiers = ville?.quartiers.filter((q) => !avecCommunes || q.communeId === communeId) ?? [];
+  // Ville choisie dans la liste, ou saisie (elle sera ajoutée) ; ses communes et quartiers connus servent de suggestions.
+  const villeConnue = villes.find((v) => cle(v.nom) === cle(ville));
+  const communes = villeConnue?.communes ?? [];
+  const quartiers = (villeConnue?.quartiers ?? []).filter((q) => !commune.trim() || !q.commune || cle(q.commune) === cle(commune));
+  const nouveau = (valeur: string, liste: string[]) => valeur.trim() !== "" && !liste.some((n) => cle(n) === cle(valeur));
 
   async function enregistrer(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (envoi) return;
-    if (!quartierId) return setErreur("Choisissez la ville et le quartier du client");
+    if (!ville.trim() || !quartier.trim()) return setErreur("Indiquez la ville et le quartier du client");
     const f = new FormData(e.currentTarget);
     const texte = (n: string) => String(f.get(n) ?? "").trim();
     setEnvoi(true);
@@ -192,9 +201,16 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
         nom: texte("nom"),
         telephone: texte("telephone"),
         telephone2: texte("telephone2"),
-        quartierId,
+        lieu: { ville: ville.trim(), commune: commune.trim() || null, quartier: quartier.trim() },
         adresse: texte("adresse"),
-        paiement: paye ? { operateur: moyen, ...(texte("reference") && { reference: texte("reference") }) } : null,
+        paiement:
+          encaissement === "aucun"
+            ? null
+            : {
+                operateur: moyen,
+                ...(encaissement === "acompte" && { montantFcfa: Number(texte("montant")) }),
+                ...(texte("reference") && { reference: texte("reference") }),
+              },
       });
       onFait(r);
     } catch (err) {
@@ -240,43 +256,66 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
 
       <section className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm">
         <h2 className="text-xs font-bold tracking-wide text-attenue uppercase">Lieu</h2>
-        <div className="grid gap-1 text-sm font-semibold">
-          Ville
-          <Puces
-            nom="Ville"
-            options={villes.map((v) => ({ code: v.id, libelle: v.nom }))}
-            valeur={villeId}
-            onChange={(v) => {
-              setVilleId(v);
-              setCommuneId(null);
-              setQuartierId(null);
-            }}
-          />
-        </div>
-        {avecCommunes && (
-          <div className="grid gap-1 text-sm font-semibold">
-            Commune
-            <Puces
-              nom="Commune"
-              options={ville!.communes.map((c) => ({ code: c.id, libelle: c.nom }))}
-              valeur={communeId}
-              onChange={(c) => {
-                setCommuneId(c);
-                setQuartierId(null);
+        <div className="grid grid-cols-2 gap-3">
+          <Champ libelle="Ville" aide={nouveau(ville, villes.map((v) => v.nom)) ? "Ville absente de la liste : elle sera ajoutée." : undefined}>
+            <input
+              list="villes-ci"
+              value={ville}
+              onChange={(e) => {
+                setVille(e.target.value);
+                setCommune("");
+                setQuartier("");
               }}
+              required
+              maxLength={80}
+              autoComplete="off"
+              placeholder="Choisir ou saisir"
+              className={CHAMP}
             />
-          </div>
-        )}
-        {ville && (!avecCommunes || communeId) && (
-          <div className="grid gap-1 text-sm font-semibold">
-            Quartier
-            {quartiers.length === 0 ? (
-              <span className="text-sm font-normal text-attenue">Aucun quartier enregistré ici : demandez à la centrale de l'ajouter.</span>
-            ) : (
-              <Puces nom="Quartier" options={quartiers.map((q) => ({ code: q.id, libelle: q.nom }))} valeur={quartierId} onChange={setQuartierId} />
-            )}
-          </div>
-        )}
+            <datalist id="villes-ci">
+              {villes.map((v) => (
+                <option key={v.nom} value={v.nom} />
+              ))}
+            </datalist>
+          </Champ>
+          <Champ libelle={communes.length ? "Commune" : "Commune (facultatif)"} aide={nouveau(commune, communes) ? "Commune absente : elle sera ajoutée." : undefined}>
+            <input
+              list="communes-ville"
+              value={commune}
+              onChange={(e) => {
+                setCommune(e.target.value);
+                setQuartier("");
+              }}
+              required={communes.length > 0}
+              maxLength={80}
+              autoComplete="off"
+              placeholder={communes.length ? "Choisir ou saisir" : "—"}
+              className={CHAMP}
+            />
+            <datalist id="communes-ville">
+              {communes.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </Champ>
+        </div>
+        <Champ libelle="Quartier" aide={nouveau(quartier, quartiers.map((q) => q.nom)) ? "Quartier absent de la liste : il sera ajouté." : undefined}>
+          <input
+            list="quartiers-ville"
+            value={quartier}
+            onChange={(e) => setQuartier(e.target.value)}
+            required
+            maxLength={80}
+            autoComplete="off"
+            placeholder="Choisir ou saisir"
+            className={CHAMP}
+          />
+          <datalist id="quartiers-ville">
+            {quartiers.map((q) => (
+              <option key={`${q.commune}-${q.nom}`} value={q.nom} />
+            ))}
+          </datalist>
+        </Champ>
         <Champ libelle="Adresse ou repère" aide="Soyez le plus précis possible : c'est ce qui permet de retrouver la maison pour poser la plaque.">
           <textarea name="adresse" required minLength={5} maxLength={300} rows={2} placeholder="Villa 453, portail bleu, 2e rue après la pharmacie du marché…" className={CHAMP} />
         </Champ>
@@ -287,13 +326,19 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
         <Puces
           nom="Encaissement"
           options={[
-            { code: "oui", libelle: "Payé" },
-            { code: "non", libelle: "Pas encore payé" },
+            { code: "total", libelle: `Payé (${PRIX})` },
+            { code: "acompte", libelle: "Acompte / avance" },
+            { code: "aucun", libelle: "Pas encore payé" },
           ]}
-          valeur={paye ? "oui" : "non"}
-          onChange={(v) => setPaye(v === "oui")}
+          valeur={encaissement}
+          onChange={setEncaissement}
         />
-        {paye && (
+        {encaissement === "acompte" && (
+          <Champ libelle="Montant versé (F CFA)" aide={`Le solde sera à payer avant l'ouverture de l'abonnement (total ${PRIX}).`}>
+            <input name="montant" type="number" inputMode="numeric" required min={100} max={FORFAIT_UNIQUE.abonnementFcfa - 1} step={100} placeholder="5000" className={CHAMP} />
+          </Champ>
+        )}
+        {encaissement !== "aucun" && (
           <>
             <Puces nom="Moyen de paiement" options={MOYENS.map((m) => ({ code: m, libelle: LIBELLES_MOYEN_PAIEMENT[m] }))} valeur={moyen} onChange={setMoyen} />
             {moyen !== "ESPECES" && (

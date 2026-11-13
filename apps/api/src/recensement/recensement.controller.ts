@@ -1,6 +1,6 @@
-import { BadRequestException, Body, Controller, Get, Injectable, Module, Post, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, ConflictException, Controller, Get, Injectable, Module, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { CIBLES, FORFAIT_UNIQUE, MOYENS_PAIEMENT, urlAlerte, type Cible } from "@apsig/domain";
+import { CIBLES, cleLieu, codeLieu, COMMUNES_CI, FORFAIT_UNIQUE, MOYENS_PAIEMENT, nomLieu, urlAlerte, VILLES_CI, type Cible } from "@apsig/domain";
 import { AbonnementsModule } from "../abonnements/abonnements.module.ts";
 import { AbonnementsService } from "../abonnements/abonnements.service.ts";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
@@ -20,19 +20,31 @@ const recensement = z
     nom: texte(60),
     telephone,
     telephone2: z.union([z.literal(""), telephone]).optional().transform((v) => (v ? v : null)),
-    quartierId: z.string().min(1),
+    // Lieu par son nom, choisi dans la liste ou saisi : une ville, une commune ou un quartier absent du référentiel y est ajouté.
+    lieu: z
+      .object({
+        ville: texte(80),
+        commune: z.string().trim().max(80).optional().nullable().transform((v) => (v ? v : null)),
+        quartier: texte(80),
+      })
+      .optional(),
+    // Ancienne forme (application mobile non mise à jour) : quartier déjà connu.
+    quartierId: z.string().min(1).optional(),
     // Adresse ou repère, le plus précis possible : c'est ce qui guide l'agent au second passage.
     adresse: z.string().trim().min(5, "Adresse ou repère trop court : soyez le plus précis possible").max(300),
     // Encaissement de l'offre de lancement au moment du recensement.
     paiement: z
       .object({
         operateur: z.enum(MOYENS_PAIEMENT),
+        // Montant encaissé : 10 000 F (forfait soldé) ou moins (acompte / avance). Absent : 10 000 F.
+        montantFcfa: z.number().int().min(100).max(FORFAIT_UNIQUE.abonnementFcfa).optional(),
         reference: z.string().trim().min(3).max(64).optional(),
         telephone: telephone.optional(),
       })
       .nullable(),
   })
-  .refine((d) => d.cible !== "ENTREPRISE" || d.rccm, { message: "Numéro du registre du commerce requis pour une entreprise", path: ["rccm"] });
+  .refine((d) => d.cible !== "ENTREPRISE" || d.rccm, { message: "Numéro du registre du commerce requis pour une entreprise", path: ["rccm"] })
+  .refine((d) => d.lieu || d.quartierId, { message: "Ville et quartier requis", path: ["lieu"] });
 
 // Inscription en deux temps. 1. Recensement : l'agent enregistre le client (identité, RCCM pour une entreprise, lieu,
 // encaissement) ; le foyer est créé avec son code Code-Secours, celui de la plaque (DAL-LOBIA-053), et ses QR.
@@ -44,32 +56,73 @@ export class RecensementService {
     private readonly abonnements: AbonnementsService,
   ) {}
 
-  // Villes, communes et quartiers du référentiel APSIG, pour les listes de l'agent.
+  // Listes de l'agent : toutes les villes de Côte d'Ivoire (liste de départ et référentiel APSIG), leurs communes
+  // et leurs quartiers déjà connus. Les noms suffisent : un lieu absent est ajouté au recensement.
   async referentiel() {
-    const villes = await this.db.ville.findMany({
-      orderBy: { nom: "asc" },
-      include: { communes: { orderBy: { nom: "asc" } }, quartiers: { orderBy: { nom: "asc" } } },
+    const villes = await this.db.ville.findMany({ include: { communes: true, quartiers: { include: { commune: true } } } });
+    const parCle = new Map(villes.map((v) => [cleLieu(v.nom), v]));
+    const noms = [...new Set([...VILLES_CI, ...villes.map((v) => v.nom)].map((n) => parCle.get(cleLieu(n))?.nom ?? n))];
+    const tri = (a: string, b: string) => a.localeCompare(b, "fr");
+    return noms.sort(tri).map((nom) => {
+      const v = parCle.get(cleLieu(nom));
+      const communes = new Map((COMMUNES_CI[nom] ?? []).map((c) => [cleLieu(c), c]));
+      for (const c of v?.communes ?? []) communes.set(cleLieu(c.nom), c.nom);
+      return {
+        nom,
+        communes: [...communes.values()].sort(tri),
+        quartiers: (v?.quartiers ?? []).map((q) => ({ nom: q.nom, commune: q.commune?.nom ?? null })).sort((a, b) => tri(a.nom, b.nom)),
+      };
     });
-    return villes.map((v) => ({
-      id: v.id,
-      nom: v.nom,
-      communes: v.communes.map((c) => ({ id: c.id, nom: c.nom })),
-      quartiers: v.quartiers.map((q) => ({ id: q.id, nom: q.nom, communeId: q.communeId })),
-    }));
+  }
+
+  // Ville, commune et quartier retrouvés par leur nom (sans tenir compte des accents ni de la casse), créés s'ils manquent.
+  private async quartierDe(lieu: { ville: string; commune: string | null; quartier: string }, u: UtilisateurConnecte) {
+    return this.db.$transaction(async (tx) => {
+      const ajoutes: string[] = [];
+      const villes = await tx.ville.findMany({ select: { id: true, nom: true, code: true } });
+      let ville = villes.find((v) => cleLieu(v.nom) === cleLieu(lieu.ville));
+      if (!ville) {
+        const nom = VILLES_CI.find((n) => cleLieu(n) === cleLieu(lieu.ville)) ?? nomLieu(lieu.ville);
+        ville = await tx.ville.create({ data: { nom, code: codeLieu(nom, "ville", new Set(villes.map((v) => v.code))) }, select: { id: true, nom: true, code: true } });
+        ajoutes.push(`ville ${nom}`);
+      }
+      let communeId: string | null = null;
+      if (lieu.commune) {
+        const communes = await tx.commune.findMany({ where: { villeId: ville.id } });
+        let commune = communes.find((c) => cleLieu(c.nom) === cleLieu(lieu.commune!));
+        if (!commune) {
+          const nom = (COMMUNES_CI[ville.nom] ?? []).find((n) => cleLieu(n) === cleLieu(lieu.commune!)) ?? nomLieu(lieu.commune);
+          commune = await tx.commune.create({ data: { nom, villeId: ville.id, code: codeLieu(nom, "commune", new Set(communes.map((c) => c.code))) } });
+          ajoutes.push(`commune ${nom}`);
+        }
+        communeId = commune.id;
+      }
+      const quartiers = await tx.quartier.findMany({ where: { villeId: ville.id } });
+      let quartier = quartiers.find((q) => cleLieu(q.nom) === cleLieu(lieu.quartier) && (q.communeId === communeId || !communeId));
+      if (!quartier) {
+        const nom = nomLieu(lieu.quartier);
+        quartier = await tx.quartier.create({ data: { nom, villeId: ville.id, communeId, code: codeLieu(nom, "quartier", new Set(quartiers.map((q) => q.code))) } });
+        ajoutes.push(`quartier ${nom}`);
+      }
+      if (ajoutes.length) await tx.audit.create({ data: { action: "lieu.ajouter", cible: ville.nom, auteurId: u.id, details: { ajoutes } } });
+      return quartier.id;
+    });
   }
 
   async recenser(d: z.infer<typeof recensement>, u: UtilisateurConnecte) {
     const formule = await this.db.formule.findUnique({ where: { code: `UNIQUE_${d.cible}` } });
     if (!formule?.actif) throw new BadRequestException("Forfait introuvable : prévenir la centrale");
+    const quartierId = d.lieu ? await this.quartierDe(d.lieu, u) : d.quartierId!;
     const donnees = {
       libelle: `${d.prenom} ${d.nom}`,
       adresse: d.adresse,
-      quartierId: d.quartierId,
+      quartierId,
       titulaire: { prenom: d.prenom, nom: d.nom, telephone: d.telephone },
     };
-    const opts = { recensement: true, rccm: d.rccm, telephone2: d.telephone2 };
+    const opts = { recensement: true, rccm: d.rccm, telephone2: d.telephone2, cible: d.cible };
+    const montant = d.paiement ? (d.paiement.montantFcfa ?? FORFAIT_UNIQUE.abonnementFcfa) : 0;
     let foyer;
-    if (d.paiement) {
+    if (d.paiement && montant >= FORFAIT_UNIQUE.abonnementFcfa) {
       // Payé : l'abonnement démarre (premier mois compris) et la formule crée ses supports, dont la plaque.
       foyer = await this.abonnements.creerFoyer(
         {
@@ -84,9 +137,27 @@ export class RecensementService {
         opts,
       );
     } else {
-      // Non payé : le client est réservé, sa plaque et son QR intérieur existent déjà ; l'abonnement sera ouvert à l'encaissement.
+      // Acompte ou rien encaissé : le client est réservé, sa plaque et son QR intérieur existent déjà ; l'abonnement
+      // s'ouvrira quand le solde sera payé (espace Abonnements).
+      if (d.paiement?.reference && (await this.db.paiement.findUnique({ where: { refFournisseur: d.paiement.reference } }))) {
+        throw new ConflictException("Cette référence de paiement est déjà enregistrée");
+      }
       const cree = await this.abonnements.creerFoyer(donnees, u, opts);
       for (const [type] of FORFAIT_UNIQUE.supports) await this.abonnements.ajouterSupport(cree.id, { type }, u);
+      if (d.paiement) {
+        await this.db.paiement.create({
+          data: {
+            foyerId: cree.id,
+            montantFcfa: montant,
+            operateur: d.paiement.operateur,
+            telephone: d.paiement.telephone ?? null,
+            refFournisseur: d.paiement.reference ?? null,
+            statut: "REUSSI",
+            payeLe: new Date(),
+          },
+        });
+        await this.db.audit.create({ data: { action: "paiement.acompte", cible: cree.id, auteurId: u.id, details: { montantFcfa: montant, operateur: d.paiement.operateur } } });
+      }
       foyer = await this.abonnements.detail(cree.id);
     }
     return this.resume(foyer.id);
@@ -105,14 +176,17 @@ export class RecensementService {
         quartier: { include: { ville: true, commune: true } },
         membres: { where: { role: "TITULAIRE" }, take: 1 },
         supports: { where: { type: { in: ["PORTAIL", "INTERIEUR"] } }, include: { pose: true }, orderBy: { creeLe: "asc" } },
-        paiements: { where: { statut: "REUSSI" }, select: { id: true }, take: 1 },
+        paiements: { where: { statut: "REUSSI" }, select: { montantFcfa: true } },
         abonnements: { orderBy: { fin: "desc" }, take: 1, include: { formule: true } },
       },
     });
     const t = f.membres[0];
     const plaque = f.supports.find((s) => s.type === "PORTAIL");
     const interieur = f.supports.find((s) => s.type === "INTERIEUR");
-    const cible = f.abonnements[0]?.formule.code.replace(/^UNIQUE_/, "") as Cible | undefined;
+    const cible = (f.cible ?? f.abonnements[0]?.formule.code.replace(/^UNIQUE_/, "")) as Cible | undefined;
+    const encaisseFcfa = f.paiements.reduce((t, p) => t + p.montantFcfa, 0);
+    // Soldé : l'abonnement est ouvert. Sinon, reste à payer sur le forfait de lancement.
+    const solde = f.abonnements.length > 0;
     return {
       id: f.id,
       code: plaque?.code ?? null,
@@ -127,7 +201,9 @@ export class RecensementService {
       telephone2: t?.telephone2 ?? null,
       lieu: [f.quartier.nom, f.quartier.commune?.nom, f.quartier.ville.nom].filter(Boolean).join(", "),
       cible: cible && (CIBLES as readonly string[]).includes(cible) ? cible : null,
-      paye: f.paiements.length > 0,
+      paye: solde,
+      encaisseFcfa,
+      resteFcfa: solde ? 0 : Math.max(0, FORFAIT_UNIQUE.abonnementFcfa - encaisseFcfa),
       posee: Boolean(plaque?.pose),
       creeLe: f.creeLe,
     };

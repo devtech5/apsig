@@ -134,7 +134,7 @@ export class AbonnementsService {
   async creerFoyer(
     donnees: DonneesFoyer & { titulaire: Omit<DonneesMembre, "role">; souscription?: Souscription | undefined },
     u: UtilisateurConnecte,
-    opts: { recensement?: boolean; rccm?: string | null; telephone2?: string | null } = {},
+    opts: { recensement?: boolean; rccm?: string | null; telephone2?: string | null; cible?: string | null } = {},
   ) {
     const id = await this.db.$transaction(async (tx) => {
       await this.verifierQuartier(tx, donnees.quartierId);
@@ -149,6 +149,7 @@ export class AbonnementsService {
           cleClient: genererJeton(24),
           recenseParId: opts.recensement ? u.id : null,
           rccm: opts.rccm ?? null,
+          cible: opts.cible ?? null,
           membres: { create: { ...this.membre({ ...donnees.titulaire, role: "TITULAIRE" }), telephone2: opts.telephone2 ?? null } },
         },
       });

@@ -93,6 +93,35 @@ describe("Inscription en deux temps", () => {
     await agent.post("/pose/recensements").send({ ...client(tel("05")), adresse: "ici", paiement: null }).expect(400);
   });
 
+  it("lieu donné par son nom : ville, commune et quartier absents sont ajoutés au référentiel, puis réutilisés", async () => {
+    const { agent } = await connecter(app, db, "AGENT");
+    const suffixe = Date.now().toString().slice(-6);
+    const lieu = { ville: `Ville test ${suffixe}`, commune: `Commune ${suffixe}`, quartier: `Quartier ${suffixe}` };
+    const r = await agent.post("/pose/recensements").send({ ...client(tel("07")), quartierId: undefined, lieu, paiement: null }).expect(201);
+    const foyer = await db.foyer.findUniqueOrThrow({ where: { id: r.body.id }, include: { quartier: { include: { ville: true, commune: true } } } });
+    expect(foyer.quartier).toMatchObject({ nom: lieu.quartier, lat: null, ville: { nom: lieu.ville }, commune: { nom: lieu.commune } });
+    expect(r.body.code).toMatch(new RegExp(`^${foyer.quartier.ville.code}-${foyer.quartier.commune!.code}-${foyer.quartier.code}-\\d{3}$`));
+
+    // Même lieu écrit autrement : rien n'est recréé.
+    const autre = { ville: lieu.ville.toUpperCase(), commune: lieu.commune.toLowerCase(), quartier: ` ${lieu.quartier} ` };
+    const r2 = await agent.post("/pose/recensements").send({ ...client(tel("05")), quartierId: undefined, lieu: autre, paiement: null }).expect(201);
+    expect((await db.foyer.findUniqueOrThrow({ where: { id: r2.body.id } })).quartierId).toBe(foyer.quartierId);
+
+    const ref = await agent.get("/pose/referentiel").expect(200);
+    expect(ref.body.find((v: { nom: string }) => v.nom === "Abidjan").communes).toContain("Yopougon");
+    expect(ref.body.find((v: { nom: string }) => v.nom === lieu.ville)).toMatchObject({ communes: [lieu.commune], quartiers: [{ nom: lieu.quartier, commune: lieu.commune }] });
+  });
+
+  it("acompte : encaissé sans ouvrir l'abonnement, reste à payer affiché", async () => {
+    const { agent } = await connecter(app, db, "AGENT");
+    const r = await agent.post("/pose/recensements").send({ ...client(tel("07")), paiement: { operateur: "ESPECES", montantFcfa: 4_000 } }).expect(201);
+    expect(r.body).toMatchObject({ paye: false, encaisseFcfa: 4_000, resteFcfa: 6_000, cible: "FAMILLE" });
+    const foyer = await db.foyer.findUniqueOrThrow({ where: { id: r.body.id }, include: { abonnements: true, paiements: true } });
+    expect(foyer.abonnements).toHaveLength(0);
+    expect(foyer.paiements.map((p) => p.montantFcfa)).toEqual([4_000]);
+    await agent.post("/pose/recensements").send({ ...client(tel("01")), paiement: { operateur: "ESPECES", montantFcfa: 12_000 } }).expect(400);
+  });
+
   it("réservé à l'espace Pose ; code de plaque inconnu : 404", async () => {
     await request(app.getHttpServer()).get("/pose/referentiel").expect(401);
     const { agent: operateur } = await connecter(app, db, "OPERATEUR");

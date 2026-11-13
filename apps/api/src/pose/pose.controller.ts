@@ -77,7 +77,11 @@ export class PoseService {
       await tx.pose.upsert({ where: { supportId: s.id }, create: { supportId: s.id, ...donnees }, update: donnees });
       if (s.statut === "STOCK") await tx.support.update({ where: { id: s.id }, data: { statut: "ACTIF" } });
       // Support fixe : la porte du foyer est désormais connue au mètre près.
-      if (fixe) await tx.foyer.update({ where: { id: s.foyerId }, data: { lat: position.lat, lng: position.lng, adresseVerifiee: true } });
+      if (fixe) {
+        const foyer = await tx.foyer.update({ where: { id: s.foyerId }, data: { lat: position.lat, lng: position.lng, adresseVerifiee: true } });
+        // Quartier ajouté au recensement, encore sans centre : la première plaque posée le situe.
+        await tx.quartier.updateMany({ where: { id: foyer.quartierId, lat: null }, data: { lat: position.lat, lng: position.lng } });
+      }
       await tx.audit.create({ data: { action: "support.poser", cible: s.foyerId, auteurId: u.id, details: { supportId: s.id, code: s.code, precisionM: Math.round(position.precisionM) } } });
     });
     return this.support(jeton);

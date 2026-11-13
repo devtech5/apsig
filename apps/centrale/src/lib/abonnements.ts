@@ -14,7 +14,8 @@ export type Formule = {
 };
 
 export type Referentiel = {
-  villes: { id: string; code: string; nom: string; quartiers: (Position & { id: string; nom: string })[] }[];
+  // Coordonnées vides pour un quartier ajouté au recensement, tant qu'aucune plaque n'y est posée.
+  villes: { id: string; code: string; nom: string; quartiers: { id: string; nom: string; lat: number | null; lng: number | null }[] }[];
   formules: Formule[];
 };
 

@@ -61,7 +61,7 @@ export function ChoixAdresse({
         <Carte
           className="h-72"
           points={position ? [{ ...position, libelle: "Adresse du foyer" }] : []}
-          centre={quartier ?? null}
+          centre={quartier?.lat != null && quartier.lng != null ? { lat: quartier.lat, lng: quartier.lng } : null}
           onPlacer={onPosition}
         />
         <p className="pointer-events-none absolute top-2 left-2 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-semibold shadow">

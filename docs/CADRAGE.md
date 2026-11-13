@@ -79,7 +79,7 @@ Règles :
 
 ## 5. Forfaits
 
-Tarif de lancement fixé le 11/11/2026 : **un forfait unique**. L'**abonnement** de **10 000 F** est payé à l'entrée, **en une seule fois, et n'est pas remboursable** (supports et mise en service) ; la **mensualité** finance ensuite la centrale 24/7 et dépend du client.
+Tarif de lancement fixé le 11/11/2026 : **un forfait unique**. L'**abonnement** de **10 000 F** est payé à l'entrée et **n'est pas remboursable** (supports et mise en service) ; un **acompte** est possible au recensement, l'abonnement s'ouvre quand le solde est payé ; la **mensualité** finance ensuite la centrale 24/7 et dépend du client.
 
 | Client | Abonnement | Mensualité |
 |---|---|---|
@@ -134,7 +134,8 @@ Tranchées le 27/10/2026 :
 
 Tranchées le 11/11/2026 :
 - [x] **Forfait unique de lancement** : 10 000 F à l'entrée, premier mois compris ; mensualité de 2 000 F (particulier), 5 000 F (famille), 10 000 F (entreprise et autres organisations) ; options ajoutées plus tard (§5). Remplace la grille Bronze / Gold / Premium du matin même, les formules Enfant, Maison, Famille complète et Sécurité +, ainsi que la grille Standard / Premium des documents terrain du 04/11.
-- [x] **Abonnement** : payé en une seule fois, non remboursable (pas d'avance ni de paiement fractionné).
+- [x] **Abonnement** : non remboursable. Depuis le 13/11/2026, le client peut verser un **acompte (avance)** au recensement ; l'abonnement s'ouvre au paiement du solde (décision du 11/11 « en une seule fois » levée).
+- [x] **Lieux** : listes des villes de Côte d'Ivoire (`packages/domain/src/lieux.ts`) et des communes d'Abidjan ; une ville, une commune ou un quartier absent est ajouté au référentiel au recensement.
 - [x] **Mandataires** : indépendants, non salariés d'APSIG ; commission due à la pose validée de la plaque.
 
 Ouvertes :

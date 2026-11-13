@@ -18,6 +18,8 @@ export type Recense = {
   lieu: string;
   cible: "PARTICULIER" | "FAMILLE" | "ENTREPRISE" | null;
   paye: boolean;
+  encaisseFcfa: number;
+  resteFcfa: number;
   posee: boolean;
   creeLe: string;
 };
@@ -58,7 +60,7 @@ export default function Recensements() {
                   {r.rccm ? ` · RCCM ${r.rccm}` : ""}
                 </Texte>
                 <View style={styles.etiquettes}>
-                  <Text style={[styles.etiquette, r.paye ? styles.ok : styles.attente]}>{r.paye ? "Payé" : "Non payé"}</Text>
+                  <Text style={[styles.etiquette, r.paye ? styles.ok : styles.attente]}>{r.paye ? "Payé" : r.encaisseFcfa > 0 ? `Acompte · reste ${r.resteFcfa.toLocaleString("fr-FR")} F` : "Non payé"}</Text>
                   <Text style={[styles.etiquette, r.posee ? styles.ok : styles.attente]}>{r.posee ? "Plaque posée" : "Plaque à poser"}</Text>
                 </View>
               </View>
