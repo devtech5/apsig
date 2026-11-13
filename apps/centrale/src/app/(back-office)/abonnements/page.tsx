@@ -43,6 +43,9 @@ export default function PageAbonnements() {
           aria-label="Rechercher un foyer"
           className={`${CHAMP} max-w-xs`}
         />
+        <Link href="/abonnements/demandes" className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-brand ring-1 ring-ligne hover:bg-fond">
+          Demandes en ligne
+        </Link>
         <Link href="/abonnements/nouveau" className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white">
           <Icone nom="plus" className="size-4" /> Nouveau foyer
         </Link>

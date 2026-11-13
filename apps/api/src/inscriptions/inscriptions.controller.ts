@@ -1,7 +1,8 @@
-import { Body, Controller, HttpCode, Module, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Module, NotFoundException, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import { z } from "zod";
 import { CIBLES } from "@apsig/domain";
+import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
 
@@ -25,6 +26,8 @@ const demande = z.object({
   site: z.string().max(200).optional(),
 });
 
+const traitement = z.object({ traitee: z.boolean() });
+
 // Route publique appelée par le formulaire de code-secours.apsig.online (limitée par IP, comme les alertes).
 @Controller("public")
 export class InscriptionsController {
@@ -41,5 +44,39 @@ export class InscriptionsController {
   }
 }
 
-@Module({ controllers: [InscriptionsController] })
+// Demandes reçues en ligne, rappelées par les conseillers depuis l'espace Abonnements.
+@Controller("abonnements/demandes")
+@UseGuards(BackOfficeGuard)
+@EspaceRequis("abonnements")
+export class DemandesController {
+  constructor(private readonly db: PrismaService) {}
+
+  @Get()
+  async lister(@Query("statut") statut?: string) {
+    const filtre = statut === "TRAITEE" ? "TRAITEE" : "NOUVELLE";
+    const [demandes, nouvelles] = await Promise.all([
+      // Les plus anciennes d'abord à rappeler ; les plus récentes d'abord dans l'historique.
+      this.db.demandeInscription.findMany({ where: { statut: filtre }, orderBy: { creeLe: filtre === "NOUVELLE" ? "asc" : "desc" }, take: 200 }),
+      this.db.demandeInscription.count({ where: { statut: "NOUVELLE" } }),
+    ]);
+    return { demandes, nouvelles };
+  }
+
+  @Post(":id/traiter")
+  @HttpCode(200)
+  async traiter(@Param("id") id: string, @Body(new ZodPipe(traitement)) { traitee }: z.infer<typeof traitement>, @Utilisateur() u: UtilisateurConnecte) {
+    return this.db.$transaction(async (tx) => {
+      const existante = await tx.demandeInscription.findUnique({ where: { id } });
+      if (!existante) throw new NotFoundException("Demande introuvable");
+      const demande = await tx.demandeInscription.update({
+        where: { id },
+        data: traitee ? { statut: "TRAITEE", traiteeLe: new Date() } : { statut: "NOUVELLE", traiteeLe: null },
+      });
+      await tx.audit.create({ data: { action: traitee ? "demande.traiter" : "demande.rouvrir", cible: id, auteurId: u.id, details: { telephone: demande.telephone } } });
+      return demande;
+    });
+  }
+}
+
+@Module({ controllers: [InscriptionsController, DemandesController] })
 export class InscriptionsModule {}
