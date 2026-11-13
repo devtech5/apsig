@@ -95,6 +95,10 @@ Le **premier mois est compris** dans l'abonnement ; la mensualité court dès le
 
 Les inscriptions en ligne (`code-secours.apsig.online`, `apps/inscription`) déposent une demande sans paiement ; un conseiller rappelle.
 
+**Inscription en deux temps** (décidée le 13/11/2026) :
+1. **Recensement** par un agent de terrain, dans l'application mobile : nom, prénom, téléphone, type de client, ville / commune / quartier choisis dans le référentiel APSIG, encaissement des 10 000 F (espèces ou Mobile Money avec référence) ou « pas encore payé ». Le foyer est créé aussitôt avec son **code Code-Secours**, qui est le code de la plaque (`DAL-LOBIA-053`, `ABJ-YOP-NIANGON-053`) et identifie le client.
+2. **Pose** lors d'un second passage : l'agent fixe la plaque portant ce code et son QR, puis la scanne ; le GPS relevé devient l'adresse vérifiée du foyer.
+
 Un abonnement expiré ne bloque jamais une urgence.
 
 Prestations payantes : ambulance (20 000 F abonné), IDE à domicile (5 000 F jour / 7 000 F nuit).

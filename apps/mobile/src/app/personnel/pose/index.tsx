@@ -23,6 +23,7 @@ export default function Pose() {
 
   return (
     <Ecran>
+      <Bouton grand icone="account-plus" couleur={COULEURS.succes} libelle="Recensement des clients" onPress={() => router.push("/personnel/recensement")} />
       <Bouton grand icone="qrcode-scan" libelle="Scanner le QR posé" onPress={() => router.push({ pathname: "/scanner", params: { mode: "pose" } })} />
       <Texte attenue>Fixez le QR, placez-vous devant, puis scannez-le : la position relevée devient l'adresse vérifiée du foyer.</Texte>
       <Erreur message={erreur} />

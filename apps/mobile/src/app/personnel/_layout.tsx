@@ -19,6 +19,8 @@ export default function EspacePersonnel() {
       <Stack.Screen name="index" options={{ title: "APSIG · Personnel" }} />
       <Stack.Screen name="pose/index" options={{ title: "Pose des QR" }} />
       <Stack.Screen name="pose/[jeton]" options={{ title: "Poser le QR" }} />
+      <Stack.Screen name="recensement/index" options={{ title: "Recensement" }} />
+      <Stack.Screen name="recensement/nouveau" options={{ title: "Nouveau client" }} />
       <Stack.Screen name="terrain/index" options={{ title: "Mon unité" }} />
       <Stack.Screen name="terrain/[numero]" options={{ title: "Mission" }} />
     </Stack>

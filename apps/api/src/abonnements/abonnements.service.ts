@@ -130,7 +130,11 @@ export class AbonnementsService {
     return this.vue(await this.charger(this.db, id));
   }
 
-  async creerFoyer(donnees: DonneesFoyer & { titulaire: Omit<DonneesMembre, "role">; souscription?: Souscription | undefined }, u: UtilisateurConnecte) {
+  async creerFoyer(
+    donnees: DonneesFoyer & { titulaire: Omit<DonneesMembre, "role">; souscription?: Souscription | undefined },
+    u: UtilisateurConnecte,
+    opts: { recensement?: boolean } = {},
+  ) {
     const id = await this.db.$transaction(async (tx) => {
       await this.verifierQuartier(tx, donnees.quartierId);
       const foyer = await tx.foyer.create({
@@ -142,6 +146,7 @@ export class AbonnementsService {
           lat: donnees.position?.lat ?? null,
           lng: donnees.position?.lng ?? null,
           cleClient: genererJeton(24),
+          recenseParId: opts.recensement ? u.id : null,
           membres: { create: { ...this.membre({ ...donnees.titulaire, role: "TITULAIRE" }) } },
         },
       });

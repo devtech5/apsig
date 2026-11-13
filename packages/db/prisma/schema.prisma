@@ -68,12 +68,17 @@ model Foyer {
   adresseVerifiee Boolean         @default(false) // vrai après la pose d'un support fixe
   cleClient       String          @unique // lien de l'espace client envoyé par SMS
   creeLe          DateTime        @default(now())
+  // Agent qui a recensé le client sur le terrain (inscription en deux temps : recensement, puis pose).
+  recenseParId    String?
+  recensePar      Utilisateur?    @relation("Recensement", fields: [recenseParId], references: [id])
   membres         Membre[]
   contacts        ContactUrgence[]
   supports        Support[]
   abonnements     Abonnement[]
   paiements       Paiement[]
   alertes         Alerte[]
+
+  @@index([recenseParId])
 }
 
 enum RoleMembre {
@@ -407,6 +412,7 @@ model Utilisateur {
   comptes    Compte[]
   secondsFacteurs SecondFacteur[]
   poses      Pose[]
+  foyersRecenses Foyer[]  @relation("Recensement")
   alertesTraitees Alerte[]   @relation("Operateur")
   alertesAttribuees Alerte[] @relation("Attribution")
   evenements EvenementAlerte[]

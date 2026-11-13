@@ -11,6 +11,7 @@ import { InscriptionsModule } from "./inscriptions/inscriptions.controller.ts";
 import { FluxModule } from "./flux/flux.module.ts";
 import { NotificationsModule } from "./notifications/notifications.service.ts";
 import { PoseModule } from "./pose/pose.controller.ts";
+import { RecensementModule } from "./recensement/recensement.controller.ts";
 import { PrismaModule } from "./prisma/prisma.module.ts";
 import { SanteController } from "./sante/sante.controller.ts";
 import { SupervisionModule } from "./supervision/supervision.module.ts";
@@ -31,6 +32,7 @@ import { TerrainModule } from "./terrain/terrain.controller.ts";
     AdministrationModule,
     ClientModule,
     PoseModule,
+    RecensementModule,
     TerrainModule,
   ],
   controllers: [SanteController],
