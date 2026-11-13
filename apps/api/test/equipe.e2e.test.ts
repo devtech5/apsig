@@ -100,3 +100,32 @@ describe("Accès terrain", () => {
     expect(comptes.body.find((c: { id: string }) => c.id === r.body.compte.id)).toMatchObject({ chef: { id: chef.id }, identifiant: expect.stringMatching(/^07 /) });
   });
 });
+
+describe("Poseurs et zones", () => {
+  it("le chef crée un poseur au téléphone, lui attribue une commune ; le poseur ne voit que les clients de sa zone", async () => {
+    const { agent: chef } = await connecter(app, db, "CHEF_EQUIPE");
+    const tel = telephone();
+    const cree = await chef.post("/equipe/membres").send({ nom: "Diallo Moussa", telephone: tel, role: "AGENT" }).expect(201);
+    const suffixe = Date.now().toString().slice(-6);
+    const zone = { ville: `Ville zone ${suffixe}`, commune: `Commune A ${suffixe}` };
+    const t = await chef.put(`/equipe/membres/${cree.body.compte.id}/zones`).send({ zones: [zone] }).expect(200);
+    expect(t.body.membres.find((m: { id: string }) => m.id === cree.body.compte.id).zones).toEqual([zone]);
+
+    // Deux clients : un dans la zone, un dans une autre commune de la même ville.
+    const recense = (commune: string) =>
+      chef
+        .post("/pose/recensements")
+        .send({ cible: "PARTICULIER", prenom: "Client", nom: commune, telephone: "0102030405", lieu: { ville: zone.ville, commune, quartier: `Q ${commune}` }, adresse: "Porte rouge près du marché", paiement: null })
+        .expect(201);
+    const dedans = await recense(zone.commune);
+    await recense(`Commune B ${suffixe}`);
+
+    const poseur = request.agent(app.getHttpServer());
+    await poseur.post("/api/auth/sign-in/email").set("Origin", config.centraleUrl).send({ email: `225${tel}@terrain.apsig.ci`, password: cree.body.motDePasse }).expect(200);
+    expect((await poseur.get("/compte").expect(200)).body).toMatchObject({ role: "AGENT", espaces: ["pose"] });
+    await poseur.post("/pose/recensements").send({}).expect(403);
+    const liste = await poseur.get("/pose/a-poser").expect(200);
+    expect(liste.body.zones).toEqual([zone]);
+    expect(liste.body.clients.map((c: { code: string }) => c.code)).toEqual([dedans.body.code]);
+  });
+});

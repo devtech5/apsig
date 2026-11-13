@@ -39,7 +39,7 @@ afterAll(async () => {
 
 describe("Inscription en deux temps", () => {
   it("étape 1 puis étape 2 : recensement payé, puis pose par code plaque avec GPS à 5 m et photos", async () => {
-    const { agent } = await connecter(app, db, "AGENT");
+    const { agent } = await connecter(app, db, "CHEF_EQUIPE");
     const ref = await agent.get("/pose/referentiel").expect(200);
     expect(ref.body.some((v: { quartiers: { id: string }[] }) => v.quartiers.some((q) => q.id === quartierId))).toBe(true);
 
@@ -83,7 +83,7 @@ describe("Inscription en deux temps", () => {
   });
 
   it("entreprise : numéro du registre du commerce obligatoire ; adresse trop vague refusée", async () => {
-    const { agent } = await connecter(app, db, "AGENT");
+    const { agent } = await connecter(app, db, "CHEF_EQUIPE");
     const entreprise = { ...client(tel("01")), cible: "ENTREPRISE", paiement: null };
     const sansRccm = await agent.post("/pose/recensements").send(entreprise).expect(400);
     expect(sansRccm.body.erreurs.map((e: { champ: string }) => e.champ)).toContain("rccm");
@@ -94,7 +94,7 @@ describe("Inscription en deux temps", () => {
   });
 
   it("lieu donné par son nom : ville, commune et quartier absents sont ajoutés au référentiel, puis réutilisés", async () => {
-    const { agent } = await connecter(app, db, "AGENT");
+    const { agent } = await connecter(app, db, "CHEF_EQUIPE");
     const suffixe = Date.now().toString().slice(-6);
     const lieu = { ville: `Ville test ${suffixe}`, commune: `Commune ${suffixe}`, quartier: `Quartier ${suffixe}` };
     const r = await agent.post("/pose/recensements").send({ ...client(tel("07")), quartierId: undefined, lieu, paiement: null }).expect(201);
@@ -113,7 +113,7 @@ describe("Inscription en deux temps", () => {
   });
 
   it("acompte : encaissé sans ouvrir l'abonnement, reste à payer affiché", async () => {
-    const { agent } = await connecter(app, db, "AGENT");
+    const { agent } = await connecter(app, db, "CHEF_EQUIPE");
     const r = await agent.post("/pose/recensements").send({ ...client(tel("07")), paiement: { operateur: "ESPECES", montantFcfa: 4_000 } }).expect(201);
     expect(r.body).toMatchObject({ paye: false, encaisseFcfa: 4_000, resteFcfa: 6_000, cible: "FAMILLE" });
     const foyer = await db.foyer.findUniqueOrThrow({ where: { id: r.body.id }, include: { abonnements: true, paiements: true } });
@@ -126,7 +126,7 @@ describe("Inscription en deux temps", () => {
     await request(app.getHttpServer()).get("/pose/referentiel").expect(401);
     const { agent: operateur } = await connecter(app, db, "OPERATEUR");
     await operateur.post("/pose/recensements").send({ ...client(tel("07")), paiement: null }).expect(403);
-    const { agent } = await connecter(app, db, "AGENT");
+    const { agent } = await connecter(app, db, "CHEF_EQUIPE");
     await agent.get("/pose/plaques/XXX-INCONNU-999").expect(404);
   });
 });

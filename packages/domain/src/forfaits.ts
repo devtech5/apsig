@@ -36,3 +36,6 @@ export const FORMULES_RETIREES = [
   "ENFANT", "MAISON", "FAMILLE", "SECURITE_PLUS",
   ...["BRONZE", "GOLD", "PREMIUM"].flatMap((forfait) => CIBLES.map((cible) => `${forfait}_${cible}`)),
 ] as const;
+
+// Commission du mandataire (recenseur) : due à la pose validée de la plaque de son client (décision du 11/11/2026).
+export const COMMISSION_PLAQUE_FCFA = 1_000;
