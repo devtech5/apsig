@@ -5,12 +5,28 @@ import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } 
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
 
-// Au-delà, le point ne localise pas la porte : l'agent attend un meilleur signal, dehors.
-export const PRECISION_POSE_M = 50;
+// Au-delà, le point ne localise pas la porte : l'agent attend un meilleur signal, dehors (exigence APSIG : 5 m).
+export const PRECISION_POSE_M = 5;
 
-const pose = z.object({
-  position: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), precisionM: z.number().min(0).max(100_000) }),
+const position = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), precisionM: z.number().min(0).max(100_000) });
+const pose = z.object({ position });
+
+// Photo prise par le téléphone, compressée en JPEG avant l'envoi : data URL base64, 3 Mo au plus.
+const photo = z
+  .string()
+  .max(4_200_000)
+  .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/, "Photo illisible : reprenez-la");
+// Étape 2 de l'inscription : pose de la plaque, identifiée par son code.
+const posePlaque = z.object({
+  representant: z.object({ prenom: z.string().trim().min(1).max(60), nom: z.string().trim().min(1).max(60) }),
+  position,
+  photos: z.object({ plaque: photo, remise: photo }),
 });
+const decoder = (dataUrl: string) => {
+  const [entete, base64] = dataUrl.split(",", 2) as [string, string];
+  return { type: entete.slice(5, entete.indexOf(";")), donnees: Buffer.from(base64, "base64") };
+};
+const normaliser = (code: string) => code.trim().toUpperCase().replace(/\s+/g, "");
 
 const inclusSupport = { foyer: { include: { quartier: { include: { ville: true } } } }, membre: true, pose: { include: { agent: { select: { nom: true } } } } } as const;
 
@@ -67,6 +83,42 @@ export class PoseService {
     return this.support(jeton);
   }
 
+  // Plaque cherchée par son code (saisi par l'agent) : client, lieu et état de la pose.
+  async plaque(code: string) {
+    const s = await this.db.support.findUnique({ where: { code: normaliser(code) } });
+    if (!s || s.type !== "PORTAIL") throw new NotFoundException("Aucune plaque ne porte ce code : vérifiez-le");
+    const vue = await this.support(s.jeton);
+    const titulaire = s.foyerId ? await this.db.membre.findFirst({ where: { foyerId: s.foyerId, role: "TITULAIRE" } }) : null;
+    return { ...vue, titulaire: titulaire && { prenom: titulaire.prenom, nom: titulaire.nom, telephone: titulaire.telephone } };
+  }
+
+  // Conclusion de l'inscription : GPS à 5 m près, personne présente, photos de la plaque posée et de la remise des QR.
+  async poserPlaque(code: string, d: z.infer<typeof posePlaque>, u: UtilisateurConnecte) {
+    const s = await this.db.support.findUnique({ where: { code: normaliser(code) } });
+    if (!s || s.type !== "PORTAIL") throw new NotFoundException("Aucune plaque ne porte ce code : vérifiez-le");
+    await this.poser(s.jeton, d.position, u);
+    await this.db.$transaction(async (tx) => {
+      const p = await tx.pose.update({
+        where: { supportId: s.id },
+        data: { representantPrenom: d.representant.prenom, representantNom: d.representant.nom },
+      });
+      for (const [nature, dataUrl] of [["PLAQUE", d.photos.plaque], ["REMISE", d.photos.remise]] as const) {
+        const { type, donnees } = decoder(dataUrl);
+        await tx.photoPose.upsert({
+          where: { poseId_nature: { poseId: p.id, nature } },
+          create: { poseId: p.id, nature, type, donnees },
+          update: { type, donnees, creeLe: new Date() },
+        });
+      }
+      // Les QR intérieurs sont remis au client à la pose : ils deviennent actifs.
+      if (s.foyerId) await tx.support.updateMany({ where: { foyerId: s.foyerId, type: "INTERIEUR", statut: "STOCK" }, data: { statut: "ACTIF" } });
+      await tx.audit.create({
+        data: { action: "inscription.conclure", cible: s.foyerId ?? s.id, auteurId: u.id, details: { code: s.code, representant: `${d.representant.prenom} ${d.representant.nom}` } },
+      });
+    });
+    return this.plaque(s.code);
+  }
+
   // Tournée de l'agent : QR fixes actifs pas encore posés.
   async aPoser() {
     const supports = await this.db.support.findMany({
@@ -92,6 +144,16 @@ export class PoseController {
   @Get("a-poser")
   aPoser() {
     return this.service.aPoser();
+  }
+
+  @Get("plaques/:code")
+  plaque(@Param("code") code: string) {
+    return this.service.plaque(code);
+  }
+
+  @Post("plaques/:code")
+  poserPlaque(@Param("code") code: string, @Body(new ZodPipe(posePlaque)) body: z.infer<typeof posePlaque>, @Utilisateur() u: UtilisateurConnecte) {
+    return this.service.poserPlaque(code, body, u);
   }
 
   @Get("supports/:jeton")

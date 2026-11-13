@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import {
   CIBLES,
@@ -20,8 +22,11 @@ type Ville = { id: string; nom: string; communes: { id: string; nom: string }[];
 type Recense = {
   id: string;
   code: string | null;
+  qr: { plaque: string | null; interieur: { code: string; url: string } | null };
+  rccm: string | null;
   client: string;
   telephone: string | null;
+  telephone2: string | null;
   lieu: string;
   cible: Cible | null;
   paye: boolean;
@@ -84,6 +89,7 @@ export default function PageRecensement() {
           </p>
           <p className="text-sm text-attenue">Notez ce code au client. Il sera gravé sur sa plaque, posée lors du second passage avec relevé GPS.</p>
         </section>
+        <QrGeneres recense={fait} />
         <button type="button" className={`${BOUTON} py-3`} onClick={() => { setFait(null); setFormulaire(true); }}>
           Recenser un autre client
         </button>
@@ -123,7 +129,11 @@ export default function PageRecensement() {
       ) : (
         <section className="grid gap-2">
           <p className="text-sm text-attenue">
-            Offre de lancement : {PRIX}, premier mois compris. Le code Code-Secours est créé à l'enregistrement ; la plaque qui le porte est posée au second passage.
+            Offre de lancement : {PRIX}, premier mois compris. Le code Code-Secours et les QR sont générés à la validation ; la plaque est posée au second passage (
+            <Link href="/pose" className="font-semibold text-brand underline">
+              pose de plaque
+            </Link>
+            ).
           </p>
           {!liste && !erreur && <p className="text-attenue">Chargement…</p>}
           {liste?.length === 0 && <p className="rounded-xl bg-white p-6 text-center text-attenue">Aucun client recensé pour l'instant.</p>}
@@ -134,7 +144,9 @@ export default function PageRecensement() {
                 <p className="font-bold">{r.client}</p>
                 <p className="text-sm text-attenue">
                   {r.lieu}
-                  {r.telephone && ` · ${r.telephone}`} · {dateHeure(r.creeLe)}
+                  {r.telephone && ` · ${r.telephone}`}
+                  {r.telephone2 && ` / ${r.telephone2}`}
+                  {r.rccm && ` · RCCM ${r.rccm}`} · {dateHeure(r.creeLe)}
                 </p>
                 <p className="flex flex-wrap gap-2 text-xs font-bold">
                   <span className={`rounded px-2 py-0.5 ${r.paye ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>{r.paye ? "Payé" : "Non payé"}</span>
@@ -175,9 +187,11 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
     try {
       const r = await appelApi<Recense>("/pose/recensements", {
         cible,
+        ...(cible === "ENTREPRISE" && { rccm: texte("rccm") }),
         prenom: texte("prenom"),
         nom: texte("nom"),
         telephone: texte("telephone"),
+        telephone2: texte("telephone2"),
         quartierId,
         adresse: texte("adresse"),
         paiement: paye ? { operateur: moyen, ...(texte("reference") && { reference: texte("reference") }) } : null,
@@ -194,23 +208,33 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
     <form onSubmit={enregistrer} className="grid gap-4">
       <section className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm">
         <h2 className="text-xs font-bold tracking-wide text-attenue uppercase">Client</h2>
+        <div className="grid gap-1 text-sm font-semibold">
+          Type de client
+          <Puces nom="Type de client" options={CIBLES.map((c) => ({ code: c, libelle: LIBELLES_CIBLE_DETAILLES[c] }))} valeur={cible} onChange={setCible} />
+          <span className="text-xs font-normal text-attenue">
+            {PRIX} à l'inscription (premier mois compris), puis {fcfa(MENSUALITES_FCFA[cible])}/mois. Code Code-Secours généré automatiquement à la validation.
+          </span>
+        </div>
+        {cible === "ENTREPRISE" && (
+          <Champ libelle="Numéro du registre du commerce (RCCM)">
+            <input name="rccm" required maxLength={40} autoComplete="off" placeholder="CI-ABJ-2026-B-12345" className={`${CHAMP} uppercase`} />
+          </Champ>
+        )}
         <div className="grid grid-cols-2 gap-3">
-          <Champ libelle="Prénom">
+          <Champ libelle="Prénoms">
             <input name="prenom" required maxLength={60} autoComplete="off" className={CHAMP} />
           </Champ>
           <Champ libelle="Nom">
             <input name="nom" required maxLength={60} autoComplete="off" className={CHAMP} />
           </Champ>
         </div>
-        <Champ libelle="Téléphone">
-          <input name="telephone" type="tel" inputMode="tel" required pattern="\+?[0-9 .\-]{8,20}" title="8 à 20 chiffres" placeholder="07 00 00 00 00" className={CHAMP} />
-        </Champ>
-        <div className="grid gap-1 text-sm font-semibold">
-          Type de client
-          <Puces nom="Type de client" options={CIBLES.map((c) => ({ code: c, libelle: LIBELLES_CIBLE_DETAILLES[c] }))} valeur={cible} onChange={setCible} />
-          <span className="text-xs font-normal text-attenue">
-            {PRIX} à l'inscription (premier mois compris), puis {fcfa(MENSUALITES_FCFA[cible])}/mois.
-          </span>
+        <div className="grid grid-cols-2 gap-3">
+          <Champ libelle="Téléphone 1">
+            <input name="telephone" type="tel" inputMode="tel" required pattern="\+?[0-9 .\-]{8,20}" title="8 à 20 chiffres" placeholder="07 00 00 00 00" className={CHAMP} />
+          </Champ>
+          <Champ libelle="Téléphone 2 (facultatif)">
+            <input name="telephone2" type="tel" inputMode="tel" pattern="\+?[0-9 .\-]{8,20}" title="8 à 20 chiffres" className={CHAMP} />
+          </Champ>
         </div>
       </section>
 
@@ -253,8 +277,8 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
             )}
           </div>
         )}
-        <Champ libelle="Repère (facultatif)">
-          <input name="adresse" maxLength={300} placeholder="Villa 453, près de la pharmacie…" className={CHAMP} />
+        <Champ libelle="Adresse ou repère" aide="Soyez le plus précis possible : c'est ce qui permet de retrouver la maison pour poser la plaque.">
+          <textarea name="adresse" required minLength={5} maxLength={300} rows={2} placeholder="Villa 453, portail bleu, 2e rue après la pharmacie du marché…" className={CHAMP} />
         </Champ>
       </section>
 
@@ -291,5 +315,31 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
         </button>
       </div>
     </form>
+  );
+}
+
+// QR générés dès la validation : plaque du portail et QR intérieur, à imprimer avant la pose.
+function QrGeneres({ recense }: { recense: Recense }) {
+  const [images, setImages] = useState<{ code: string; libelle: string; src: string }[]>([]);
+  useEffect(() => {
+    const liste = [
+      recense.qr.plaque && recense.code ? { code: recense.code, libelle: "Plaque du portail", url: recense.qr.plaque } : null,
+      recense.qr.interieur ? { code: recense.qr.interieur.code, libelle: "QR intérieur", url: recense.qr.interieur.url } : null,
+    ].filter((x) => x !== null);
+    void Promise.all(liste.map(async (q) => ({ code: q.code, libelle: q.libelle, src: await QRCode.toDataURL(q.url, { errorCorrectionLevel: "H", margin: 1, width: 400 }) }))).then(setImages);
+  }, [recense]);
+  if (images.length === 0) return null;
+  return (
+    <section className="grid grid-cols-2 gap-3">
+      {images.map((q) => (
+        <figure key={q.code} className="grid justify-items-center gap-1 rounded-2xl bg-white p-3 text-center shadow-sm">
+          <img src={q.src} alt={`QR ${q.libelle} ${q.code}`} className="aspect-square w-full max-w-48" />
+          <figcaption className="text-xs">
+            <span className="block font-bold">{q.libelle}</span>
+            <span className="font-mono">{q.code}</span>
+          </figcaption>
+        </figure>
+      ))}
+    </section>
   );
 }

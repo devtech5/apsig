@@ -37,6 +37,7 @@ export function FicheFoyer({ f, referentiel, agir, envoi }: { f: Foyer; referent
           <p className="text-sm text-attenue">
             {f.quartier.nom}, {f.ville.nom}
             {f.adresse && ` · ${f.adresse}`}
+            {f.rccm && ` · RCCM ${f.rccm}`}
           </p>
           <p className="mt-1 flex flex-wrap gap-1.5 text-xs font-semibold">
             <span className={`rounded px-2 py-0.5 ${f.adresseVerifiee ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>
@@ -243,7 +244,20 @@ function BlocSupports({ f, agir, envoi }: PropsBloc) {
               {s.libelle}
               {s.vehicule && ` · ${s.vehicule}`}
               {s.poseLe ? ` · posé le ${date(s.poseLe)}` : ""}
+              {s.pose && ` par ${s.pose.agent}`}
+              {s.pose?.representant && `, remis à ${s.pose.representant}`}
+              {s.pose?.precisionM != null && ` · GPS à ${Math.round(s.pose.precisionM)} m`}
             </p>
+            {s.pose && s.pose.photos.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {s.pose.photos.map((n) => (
+                  <a key={n} href={`/api/abonnements/poses/${s.pose!.id}/photos/${n}`} target="_blank" rel="noreferrer" className="grid gap-0.5 text-xs text-attenue">
+                    <img src={`/api/abonnements/poses/${s.pose!.id}/photos/${n}`} alt={n === "PLAQUE" ? "Plaque posée" : "Remise des QR"} className="h-20 w-28 rounded-lg object-cover" />
+                    {n === "PLAQUE" ? "Plaque posée" : "Remise des QR"}
+                  </a>
+                ))}
+              </div>
+            )}
             {AVEC_PORTEUR.has(s.type) && (
               <label className="flex items-center gap-2 text-xs">
                 Porteur
@@ -358,6 +372,7 @@ function BlocMembres({ f, agir, envoi }: PropsBloc) {
                 {LIBELLES_ROLE_MEMBRE[m.role]}
                 {m.anneeNaissance && ` · né(e) en ${m.anneeNaissance}`}
                 {m.telephone && ` · ${m.telephone}`}
+                {m.telephone2 && ` / ${m.telephone2}`}
               </span>
               {m.infosMedicalesRenseignees && <span className="rounded bg-danger-fond px-1.5 py-0.5 text-xs font-semibold text-danger">Santé renseignée</span>}
               <span className="ml-auto flex gap-1">

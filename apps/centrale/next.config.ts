@@ -33,7 +33,8 @@ const config: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           // Données personnelles et de santé : la centrale ne s'affiche jamais dans un cadre tiers.
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Permissions-Policy", value: "geolocation=(), camera=(), microphone=()" },
+          // GPS et appareil photo : pose des plaques par les agents (page /pose), sur ce site seulement.
+          { key: "Permissions-Policy", value: "geolocation=(self), camera=(self), microphone=()" },
         ],
       },
     ];

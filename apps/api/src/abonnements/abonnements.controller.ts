@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, HttpCode, NotFoundException, Param, Patch, Post, Query, StreamableFile, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { MOYENS_PAIEMENT, ROLES_MEMBRE, TYPES_SUPPORT } from "@apsig/domain";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
@@ -154,5 +154,14 @@ export class AbonnementsController {
   @HttpCode(200)
   remplacer(@Param("id") id: string, @Utilisateur() u: UtilisateurConnecte) {
     return this.abonnements.remplacerJeton(id, u);
+  }
+
+  // Photos de la pose (plaque posée, remise des QR), affichées dans la fiche du foyer.
+  @Get("poses/:id/photos/:nature")
+  @Header("Cache-Control", "private, max-age=3600")
+  async photo(@Param("id") id: string, @Param("nature") nature: string) {
+    if (nature !== "PLAQUE" && nature !== "REMISE") throw new NotFoundException("Photo introuvable");
+    const p = await this.abonnements.photoPose(id, nature);
+    return new StreamableFile(Buffer.from(p.donnees), { type: p.type });
   }
 }

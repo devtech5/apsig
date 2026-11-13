@@ -42,8 +42,9 @@ describe("Pose des supports", () => {
     expect(avant.body).toMatchObject({ fixe: true, pose: null, foyer: { adresseVerifiee: false } });
 
     await agent.post(`/pose/supports/${jetons.PORTAIL}`).send({ position: { ...PORTE, precisionM: 120 } }).expect(422);
-    const pose = await agent.post(`/pose/supports/${jetons.PORTAIL}`).send({ position: { ...PORTE, precisionM: 8 } }).expect(201);
-    expect(pose.body).toMatchObject({ pose: { agent: utilisateur.nom, precisionM: 8 }, foyer: { adresseVerifiee: true, position: PORTE } });
+    await agent.post(`/pose/supports/${jetons.PORTAIL}`).send({ position: { ...PORTE, precisionM: 8 } }).expect(422);
+    const pose = await agent.post(`/pose/supports/${jetons.PORTAIL}`).send({ position: { ...PORTE, precisionM: 4 } }).expect(201);
+    expect(pose.body).toMatchObject({ pose: { agent: utilisateur.nom, precisionM: 4 }, foyer: { adresseVerifiee: true, position: PORTE } });
     expect(await db.foyer.findUniqueOrThrow({ where: { id: foyer.id } })).toMatchObject({ ...PORTE, adresseVerifiee: true });
     expect(await db.audit.count({ where: { action: "support.poser", cible: foyer.id } })).toBe(1);
 

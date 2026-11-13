@@ -95,9 +95,9 @@ Le **premier mois est compris** dans l'abonnement ; la mensualité court dès le
 
 Les inscriptions en ligne (`code-secours.apsig.online`, `apps/inscription`) déposent une demande sans paiement ; un conseiller rappelle.
 
-**Inscription en deux temps** (décidée le 13/11/2026) :
-1. **Recensement** par un agent de terrain, dans l'application mobile : nom, prénom, téléphone, type de client, ville / commune / quartier choisis dans le référentiel APSIG, encaissement des 10 000 F (espèces ou Mobile Money avec référence) ou « pas encore payé ». Le foyer est créé aussitôt avec son **code Code-Secours**, qui est le code de la plaque (`DAL-LOBIA-053`, `ABJ-YOP-NIANGON-053`) et identifie le client.
-2. **Pose** lors d'un second passage : l'agent fixe la plaque portant ce code et son QR, puis la scanne ; le GPS relevé devient l'adresse vérifiée du foyer.
+**Inscription en deux temps** (précisée le 13/11/2026) :
+1. **Recensement** par un agent de terrain (centrale web `/recensement`, puis application mobile) : type de client ; pour une entreprise ou une autre organisation, numéro du registre du commerce (RCCM) ; nom, prénoms, téléphone 1, téléphone 2 (facultatif), ville / commune / quartier du référentiel APSIG, adresse ou repère le plus précis possible ; encaissement des 10 000 F ou « pas encore payé ». À la validation, le **code Code-Secours** (code de la plaque, `DAL-LOBIA-053`) et les **QR** (plaque et intérieur) sont générés.
+2. **Pose de la plaque** (centrale web `/pose`), qui conclut l'inscription : code de la plaque, personne à contacter (nom et prénoms du représentant présent), position GPS relevée sur place **à 5 m près**, photo de la plaque posée et photo de la remise des codes QR. Les preuves sont visibles dans la fiche du foyer.
 
 Un abonnement expiré ne bloque jamais une urgence.
 

@@ -68,6 +68,8 @@ model Foyer {
   adresseVerifiee Boolean         @default(false) // vrai après la pose d'un support fixe
   cleClient       String          @unique // lien de l'espace client envoyé par SMS
   creeLe          DateTime        @default(now())
+  // Entreprise ou organisation (ONG, mutuelle…) : numéro du registre du commerce (RCCM).
+  rccm            String?
   // Agent qui a recensé le client sur le terrain (inscription en deux temps : recensement, puis pose).
   recenseParId    String?
   recensePar      Utilisateur?    @relation("Recensement", fields: [recenseParId], references: [id])
@@ -97,6 +99,7 @@ model Membre {
   prenom           String
   nom              String
   telephone        String?
+  telephone2       String?
   anneeNaissance   Int?
   // Données de santé : visibles par la centrale uniquement, jamais sur la page publique.
   infosMedicales   String?
@@ -204,7 +207,29 @@ model Pose {
   lng       Float
   precisionM Float?
   photo     String?
+  // Personne présente à la pose, qui reçoit les QR (représentant actuel du client).
+  representantNom    String?
+  representantPrenom String?
+  photos    PhotoPose[]
   poseLe    DateTime @default(now())
+}
+
+enum NaturePhoto {
+  PLAQUE // plaque posée
+  REMISE // remise des codes QR au client
+}
+
+// Preuves de la pose, prises par l'agent ; image compressée par le téléphone (JPEG, quelques centaines de Ko).
+model PhotoPose {
+  id      String      @id @default(cuid())
+  poseId  String
+  pose    Pose        @relation(fields: [poseId], references: [id], onDelete: Cascade)
+  nature  NaturePhoto
+  type    String // image/jpeg, image/png, image/webp
+  donnees Bytes
+  creeLe  DateTime    @default(now())
+
+  @@unique([poseId, nature])
 }
 
 // ─── Inscriptions en ligne ─────────────────────────────────────────────────

@@ -34,6 +34,7 @@ export type Membre = {
   prenom: string;
   nom: string;
   telephone: string | null;
+  telephone2: string | null;
   anneeNaissance: number | null;
   infosMedicalesRenseignees: boolean;
   // Téléphones reliés à l'application mobile APSIG.
@@ -53,6 +54,7 @@ export type Support = {
   vehicule: string | null;
   url: string;
   poseLe: string | null;
+  pose: { id: string; agent: string; representant: string | null; precisionM: number | null; photos: ("PLAQUE" | "REMISE")[] } | null;
   creeLe: string;
 };
 
@@ -65,6 +67,7 @@ export type Foyer = {
   ville: { id: string; code: string; nom: string };
   position: Position | null;
   adresseVerifiee: boolean;
+  rccm: string | null;
   creeLe: string;
   membres: Membre[];
   contacts: Contact[];

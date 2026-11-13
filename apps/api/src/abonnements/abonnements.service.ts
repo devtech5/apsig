@@ -26,7 +26,7 @@ const inclusFoyer = {
   quartier: { include: { ville: true, commune: true } },
   membres: { include: { acces: { where: { revoqueLe: null }, orderBy: { creeLe: "desc" } } } },
   contacts: { orderBy: { ordre: "asc" } },
-  supports: { orderBy: { creeLe: "asc" }, include: { membre: true, pose: true } },
+  supports: { orderBy: { creeLe: "asc" }, include: { membre: true, pose: { include: { agent: { select: { nom: true } }, photos: { select: { nature: true } } } } } },
   abonnements: { orderBy: { debut: "desc" }, include: { formule: true } },
   paiements: { orderBy: { creeLe: "desc" }, take: 20 },
 } satisfies Prisma.FoyerInclude;
@@ -133,7 +133,7 @@ export class AbonnementsService {
   async creerFoyer(
     donnees: DonneesFoyer & { titulaire: Omit<DonneesMembre, "role">; souscription?: Souscription | undefined },
     u: UtilisateurConnecte,
-    opts: { recensement?: boolean } = {},
+    opts: { recensement?: boolean; rccm?: string | null; telephone2?: string | null } = {},
   ) {
     const id = await this.db.$transaction(async (tx) => {
       await this.verifierQuartier(tx, donnees.quartierId);
@@ -147,7 +147,8 @@ export class AbonnementsService {
           lng: donnees.position?.lng ?? null,
           cleClient: genererJeton(24),
           recenseParId: opts.recensement ? u.id : null,
-          membres: { create: { ...this.membre({ ...donnees.titulaire, role: "TITULAIRE" }) } },
+          rccm: opts.rccm ?? null,
+          membres: { create: { ...this.membre({ ...donnees.titulaire, role: "TITULAIRE" }), telephone2: opts.telephone2 ?? null } },
         },
       });
       if (donnees.souscription) await this.souscrireDans(tx, foyer.id, donnees.souscription, u);
@@ -518,6 +519,7 @@ export class AbonnementsService {
       ville: { id: f.quartier.ville.id, code: f.quartier.ville.code, nom: f.quartier.ville.nom },
       position: f.lat != null && f.lng != null ? { lat: f.lat, lng: f.lng } : null,
       adresseVerifiee: f.adresseVerifiee,
+      rccm: f.rccm,
       creeLe: f.creeLe,
       membres: [...f.membres]
         .sort((a, b) => ORDRE_ROLE[a.role] - ORDRE_ROLE[b.role] || a.prenom.localeCompare(b.prenom))
@@ -527,6 +529,7 @@ export class AbonnementsService {
           prenom: m.prenom,
           nom: m.nom,
           telephone: m.telephone,
+          telephone2: m.telephone2,
           anneeNaissance: m.anneeNaissance,
           // Saisies ici, lues seulement par la centrale pendant une alerte.
           infosMedicalesRenseignees: !!m.infosMedicales,
@@ -544,6 +547,14 @@ export class AbonnementsService {
         vehicule: s.vehicule,
         url: urlAlerte(config.publicAlertUrl, s.jeton),
         poseLe: s.pose?.poseLe ?? null,
+        // Preuves de la pose : agent, personne présente, précision GPS, photos (servies par /abonnements/poses/:id/photos/:nature).
+        pose: s.pose && {
+          id: s.pose.id,
+          agent: s.pose.agent.nom,
+          representant: [s.pose.representantPrenom, s.pose.representantNom].filter(Boolean).join(" ") || null,
+          precisionM: s.pose.precisionM,
+          photos: s.pose.photos.map((p) => p.nature),
+        },
         creeLe: s.creeLe,
       })),
       abonnements: f.abonnements.map((a) => ({
@@ -555,5 +566,11 @@ export class AbonnementsService {
       })),
       paiements: f.paiements.map((p) => ({ id: p.id, montantFcfa: p.montantFcfa, operateur: p.operateur, statut: p.statut, reference: p.refFournisseur, creeLe: p.creeLe })),
     };
+  }
+
+  async photoPose(poseId: string, nature: "PLAQUE" | "REMISE") {
+    const p = await this.db.photoPose.findUnique({ where: { poseId_nature: { poseId, nature } } });
+    if (!p) throw new NotFoundException("Photo introuvable");
+    return p;
   }
 }

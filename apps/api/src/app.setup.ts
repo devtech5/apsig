@@ -7,6 +7,8 @@ import { config } from "./config.ts";
 export function configurerApp(app: NestExpressApplication) {
   if (config.trustProxy) app.set("trust proxy", 1);
   app.enableCors({ origin: config.corsOrigins });
+  // Les photos de la pose arrivent en JSON (base64, compressées par le téléphone) : au-delà des 100 Ko par défaut.
+  app.useBodyParser("json", { limit: "8mb" });
   // Better Auth lit lui-même le corps des requêtes : sa route passe avant le parseur JSON de Nest.
   app.getHttpAdapter().getInstance().all("/api/auth/*splat", toNodeHandler(app.get(AuthService).auth));
   return app;

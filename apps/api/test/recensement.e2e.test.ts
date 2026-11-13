@@ -12,7 +12,18 @@ let app: NestExpressApplication;
 let db: PrismaService;
 let quartierId: string;
 
-const client = (telephone: string) => ({ cible: "FAMILLE", prenom: "Adjoua", nom: "Kouamé", telephone, quartierId, adresse: "" });
+// L'API vérifie le format de la data URL, pas l'image elle-même : un contenu factice suffit.
+const PHOTO = `data:image/jpeg;base64,${Buffer.from("photo de test").toString("base64")}`;
+const tel = (prefixe: string) => `+225 ${prefixe} ${Date.now().toString().slice(-8)}`;
+const client = (telephone: string) => ({
+  cible: "FAMILLE",
+  prenom: "Adjoua",
+  nom: "Kouamé",
+  telephone,
+  telephone2: "",
+  quartierId,
+  adresse: "Villa 12, portail bleu, derrière l'école",
+});
 
 beforeAll(async () => {
   const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -26,49 +37,67 @@ afterAll(async () => {
   await app?.close();
 });
 
-describe("Inscription en deux temps : recensement puis pose", () => {
-  it("l'agent recense un client payé : code plaque, forfait unique et 10 000 F encaissés, sans GPS", async () => {
+describe("Inscription en deux temps", () => {
+  it("étape 1 puis étape 2 : recensement payé, puis pose par code plaque avec GPS à 5 m et photos", async () => {
     const { agent } = await connecter(app, db, "AGENT");
     const ref = await agent.get("/pose/referentiel").expect(200);
     expect(ref.body.some((v: { quartiers: { id: string }[] }) => v.quartiers.some((q) => q.id === quartierId))).toBe(true);
 
     const r = await agent
       .post("/pose/recensements")
-      .send({ ...client(`+225 07 ${Date.now().toString().slice(-8)}`), paiement: { operateur: "ESPECES" } })
+      .send({ ...client(tel("07")), telephone2: "05 44 33 22 11", paiement: { operateur: "ESPECES" } })
       .expect(201);
-    expect(r.body).toMatchObject({ client: "Adjoua Kouamé", cible: "FAMILLE", paye: true, posee: false });
+    expect(r.body).toMatchObject({ client: "Adjoua Kouamé", cible: "FAMILLE", paye: true, posee: false, telephone2: "05 44 33 22 11" });
     expect(r.body.code).toMatch(/^TST-CENTRE-\d{3}$/);
+    expect(r.body.qr.plaque).toContain("/s/");
+    expect(r.body.qr.interieur.url).toContain("/s/");
 
-    const foyer = await db.foyer.findUniqueOrThrow({ where: { id: r.body.id }, include: { paiements: true, abonnements: { include: { formule: true } }, supports: true } });
+    const foyer = await db.foyer.findUniqueOrThrow({ where: { id: r.body.id }, include: { paiements: true, abonnements: { include: { formule: true } } } });
     expect(foyer).toMatchObject({ lat: null, adresseVerifiee: false });
     expect(foyer.paiements.map((p) => p.montantFcfa)).toEqual([10_000]);
     expect(foyer.abonnements[0]?.formule.code).toBe("UNIQUE_FAMILLE");
-    expect(foyer.supports.map((s) => s.type).sort()).toEqual(["INTERIEUR", "PORTAIL"]);
 
-    const mes = await agent.get("/pose/recensements").expect(200);
-    expect(mes.body[0]).toMatchObject({ id: r.body.id, code: r.body.code });
+    // Étape 2 : plaque cherchée par son code (casse et espaces indifférents).
+    const plaque = await agent.get(`/pose/plaques/${encodeURIComponent(r.body.code.toLowerCase())}`).expect(200);
+    expect(plaque.body).toMatchObject({ code: r.body.code, titulaire: { prenom: "Adjoua" }, precisionRequiseM: 5, pose: null });
 
-    // Second passage : la plaque est posée, le GPS relevé devient l'adresse vérifiée.
-    const plaque = foyer.supports.find((s) => s.type === "PORTAIL")!;
-    await agent.post(`/pose/supports/${plaque.jeton}`).send({ position: { ...ADRESSE, precisionM: 8 } }).expect(201);
-    const apres = await agent.get("/pose/recensements").expect(200);
-    expect(apres.body[0]).toMatchObject({ id: r.body.id, posee: true });
-    expect(await db.foyer.findUniqueOrThrow({ where: { id: r.body.id } })).toMatchObject({ adresseVerifiee: true, lat: ADRESSE.lat });
+    const corps = { representant: { prenom: "Yao", nom: "Kouamé" }, photos: { plaque: PHOTO, remise: PHOTO } };
+    await agent.post(`/pose/plaques/${r.body.code}`).send({ ...corps, position: { ...ADRESSE, precisionM: 8 } }).expect(422);
+    await agent.post(`/pose/plaques/${r.body.code}`).send({ ...corps, photos: { plaque: "pas une photo", remise: PHOTO }, position: { ...ADRESSE, precisionM: 3 } }).expect(400);
+    const fin = await agent.post(`/pose/plaques/${r.body.code}`).send({ ...corps, position: { ...ADRESSE, precisionM: 3 } }).expect(201);
+    expect(fin.body).toMatchObject({ code: r.body.code, foyer: { adresseVerifiee: true } });
+
+    const pose = await db.pose.findFirstOrThrow({ where: { support: { code: r.body.code } }, include: { photos: true } });
+    expect(pose).toMatchObject({ representantPrenom: "Yao", representantNom: "Kouamé", precisionM: 3 });
+    expect(pose.photos.map((p) => p.nature).sort()).toEqual(["PLAQUE", "REMISE"]);
+    expect(await db.support.count({ where: { foyerId: r.body.id, type: "INTERIEUR", statut: "ACTIF" } })).toBe(1);
+    expect((await agent.get("/pose/recensements").expect(200)).body.find((x: { id: string }) => x.id === r.body.id)).toMatchObject({ posee: true });
+
+    // Les preuves sont visibles par le conseiller dans la fiche du foyer.
+    const { agent: conseiller } = await connecter(app, db, "CONSEILLER");
+    const detail = await conseiller.get(`/abonnements/foyers/${r.body.id}`).expect(200);
+    const portail = detail.body.supports.find((s: { type: string }) => s.type === "PORTAIL");
+    expect(portail.pose).toMatchObject({ representant: "Yao Kouamé", photos: expect.arrayContaining(["PLAQUE", "REMISE"]) });
+    const image = await conseiller.get(`/abonnements/poses/${portail.pose.id}/photos/PLAQUE`).expect(200);
+    expect(image.headers["content-type"]).toContain("image/jpeg");
   });
 
-  it("client pas encore payé : réservé avec son code, sans abonnement ni paiement", async () => {
+  it("entreprise : numéro du registre du commerce obligatoire ; adresse trop vague refusée", async () => {
     const { agent } = await connecter(app, db, "AGENT");
-    const r = await agent.post("/pose/recensements").send({ ...client(`+225 05 ${Date.now().toString().slice(-8)}`), paiement: null }).expect(201);
-    expect(r.body).toMatchObject({ paye: false, cible: null });
+    const entreprise = { ...client(tel("01")), cible: "ENTREPRISE", paiement: null };
+    const sansRccm = await agent.post("/pose/recensements").send(entreprise).expect(400);
+    expect(sansRccm.body.erreurs.map((e: { champ: string }) => e.champ)).toContain("rccm");
+    const r = await agent.post("/pose/recensements").send({ ...entreprise, rccm: "ci-abj-2026-b-12345" }).expect(201);
+    expect(r.body).toMatchObject({ rccm: "CI-ABJ-2026-B-12345", paye: false, cible: null });
     expect(r.body.code).toMatch(/^TST-CENTRE-\d{3}$/);
-    const foyer = await db.foyer.findUniqueOrThrow({ where: { id: r.body.id }, include: { paiements: true, abonnements: true } });
-    expect(foyer.paiements).toHaveLength(0);
-    expect(foyer.abonnements).toHaveLength(0);
+    await agent.post("/pose/recensements").send({ ...client(tel("05")), adresse: "ici", paiement: null }).expect(400);
   });
 
-  it("réservé à l'espace Pose", async () => {
+  it("réservé à l'espace Pose ; code de plaque inconnu : 404", async () => {
     await request(app.getHttpServer()).get("/pose/referentiel").expect(401);
     const { agent: operateur } = await connecter(app, db, "OPERATEUR");
-    await operateur.post("/pose/recensements").send({ ...client("+225 07 00 00 00 01"), paiement: null }).expect(403);
+    await operateur.post("/pose/recensements").send({ ...client(tel("07")), paiement: null }).expect(403);
+    const { agent } = await connecter(app, db, "AGENT");
+    await agent.get("/pose/plaques/XXX-INCONNU-999").expect(404);
   });
 });

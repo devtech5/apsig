@@ -16,6 +16,7 @@ const NAVIGATION: { href: string; libelle: string; icone: NomIcone; espace: Espa
   { href: "/abonnements", libelle: "Abonnements", icone: "maison", espace: "abonnements" },
   // Agents de terrain : recensement des clients (étape 1 de l'inscription), depuis le navigateur du téléphone.
   { href: "/recensement", libelle: "Recensement", icone: "plus", espace: "pose" },
+  { href: "/pose", libelle: "Pose de plaque", icone: "repere", espace: "pose" },
   { href: "/administration", libelle: "Administration", icone: "reglages", espace: "administration" },
 ];
 
