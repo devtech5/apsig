@@ -1,12 +1,24 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@apsig/db";
-import { aAcces, LIBELLES_TYPE_UNITE, peutGererRole, REPARTITION, type Role, type StatutUnite, type TypeUnite } from "@apsig/domain";
+import {
+  aAcces,
+  emailTerrain,
+  estEmailTerrain,
+  LIBELLES_TYPE_UNITE,
+  peutGererRole,
+  REPARTITION,
+  telephoneDeEmail,
+  type Role,
+  type StatutUnite,
+  type TypeUnite,
+} from "@apsig/domain";
 import type { UtilisateurConnecte } from "../auth/auth.module.ts";
 import { definirMotDePasse } from "../auth/comptes.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
 import { RepartitionService } from "../repartition/repartition.service.ts";
 
 const AUDIT_PAR_PAGE = 100;
+export const affichage = (email: string) => (estEmailTerrain(email) ? telephoneDeEmail(email) : email);
 
 // Administration : comptes du back-office (chacun ne gère que les rôles inférieurs au sien) et journal d'audit.
 @Injectable()
@@ -18,11 +30,17 @@ export class AdministrationService {
 
   async comptes(acteur: UtilisateurConnecte) {
     const maintenant = Date.now();
-    const comptes = await this.db.utilisateur.findMany({ orderBy: [{ actif: "desc" }, { nom: "asc" }], include: { unite: { select: { id: true, nom: true } } } });
+    const comptes = await this.db.utilisateur.findMany({
+      orderBy: [{ actif: "desc" }, { nom: "asc" }],
+      include: { unite: { select: { id: true, nom: true } }, chef: { select: { id: true, nom: true } } },
+    });
     return comptes.map((c) => ({
       id: c.id,
       nom: c.nom,
       email: c.email,
+      // Identifiant à saisir à la connexion : téléphone pour un recenseur, e-mail sinon.
+      identifiant: affichage(c.email),
+      chef: c.chef,
       role: c.role,
       actif: c.actif,
       deuxFacteurs: c.deuxFacteurs,
@@ -36,23 +54,45 @@ export class AdministrationService {
   }
 
   // Le mot de passe généré n'est montré qu'une fois, à l'administrateur, qui le transmet en main propre.
-  async creerCompte(d: { nom: string; email: string; role: Role }, acteur: UtilisateurConnecte) {
+  async creerCompte(
+    d: { nom: string; email?: string | undefined; telephone?: string | undefined; role: Role; chefId?: string | null | undefined },
+    acteur: UtilisateurConnecte,
+  ) {
     this.verifierRole(acteur, d.role);
-    const email = d.email.trim().toLowerCase();
-    if (await this.db.utilisateur.findUnique({ where: { email } })) throw new ConflictException("Un compte existe déjà avec cet e-mail");
+    const email = this.identifiant(d);
+    if (await this.db.utilisateur.findUnique({ where: { email } })) throw new ConflictException(`Un compte existe déjà avec ${estEmailTerrain(email) ? "ce téléphone" : "cet e-mail"}`);
+    if (d.chefId) await this.verifierChef(d.chefId);
     const { utilisateur, motDePasse } = await definirMotDePasse(this.db, { email, nom: d.nom, role: d.role });
-    await this.auditer(acteur, "compte.creer", utilisateur.email, { role: d.role });
-    return { compte: { id: utilisateur.id, email: utilisateur.email }, motDePasse };
+    if (d.chefId) await this.db.utilisateur.update({ where: { id: utilisateur.id }, data: { chefId: d.chefId } });
+    await this.auditer(acteur, "compte.creer", utilisateur.email, { role: d.role, ...(d.chefId && { chefId: d.chefId }) });
+    return { compte: { id: utilisateur.id, email: utilisateur.email, identifiant: affichage(utilisateur.email) }, motDePasse };
+  }
+
+  // Recenseur : identifiant dérivé du téléphone ; autres comptes : e-mail.
+  private identifiant(d: { email?: string | undefined; telephone?: string | undefined; role: Role }) {
+    if (d.role === "RECENSEUR") {
+      const email = emailTerrain(d.telephone ?? "");
+      if (!email) throw new BadRequestException("Numéro de téléphone invalide (10 chiffres)");
+      return email;
+    }
+    if (!d.email) throw new BadRequestException("E-mail requis");
+    return d.email.trim().toLowerCase();
+  }
+
+  private async verifierChef(chefId: string) {
+    const chef = await this.db.utilisateur.findUnique({ where: { id: chefId } });
+    if (!chef || chef.role !== "CHEF_EQUIPE" || !chef.actif) throw new BadRequestException("Chef d'équipe inconnu ou désactivé");
   }
 
   async modifierCompte(
     id: string,
-    d: { nom?: string | undefined; role?: Role | undefined; actif?: boolean | undefined; uniteId?: string | null | undefined },
+    d: { nom?: string | undefined; role?: Role | undefined; actif?: boolean | undefined; uniteId?: string | null | undefined; chefId?: string | null | undefined },
     acteur: UtilisateurConnecte,
   ) {
     const cible = await this.cible(id, acteur);
     if (d.role && d.role !== cible.role) this.verifierRole(acteur, d.role);
     if (d.uniteId && !(await this.db.unite.findUnique({ where: { id: d.uniteId } }))) throw new BadRequestException("Unité inconnue");
+    if (d.chefId) await this.verifierChef(d.chefId);
     await this.db.utilisateur.update({
       where: { id },
       data: {
@@ -60,6 +100,7 @@ export class AdministrationService {
         ...(d.role !== undefined && { role: d.role }),
         ...(d.actif !== undefined && { actif: d.actif }),
         ...(d.uniteId !== undefined && { uniteId: d.uniteId }),
+        ...(d.chefId !== undefined && { chefId: d.chefId }),
       },
     });
     const desactive = d.actif === false && cible.actif;
@@ -74,6 +115,7 @@ export class AdministrationService {
       ...(d.role !== undefined && { de: cible.role, vers: d.role }),
       ...(d.actif !== undefined && { actif: d.actif }),
       ...(d.uniteId !== undefined && { uniteId: d.uniteId }),
+      ...(d.chefId !== undefined && { chefId: d.chefId }),
     });
     return this.comptes(acteur);
   }

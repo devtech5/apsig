@@ -8,6 +8,7 @@ import { CentraleModule } from "./centrale/centrale.module.ts";
 import { ClientModule } from "./client/client.controller.ts";
 import { config } from "./config.ts";
 import { InscriptionsModule } from "./inscriptions/inscriptions.controller.ts";
+import { EquipeModule } from "./equipe/equipe.controller.ts";
 import { FluxModule } from "./flux/flux.module.ts";
 import { NotificationsModule } from "./notifications/notifications.service.ts";
 import { PoseModule } from "./pose/pose.controller.ts";
@@ -33,6 +34,7 @@ import { TerrainModule } from "./terrain/terrain.controller.ts";
     ClientModule,
     PoseModule,
     RecensementModule,
+    EquipeModule,
     TerrainModule,
   ],
   controllers: [SanteController],

@@ -7,7 +7,7 @@ import { useSession } from "@/lib/session";
 import { COULEURS } from "@/lib/theme";
 
 type Etape = "identifiants" | "code" | "activation";
-const ESPACES_MOBILE = ["pose", "terrain"];
+const ESPACES_MOBILE = ["recensement", "pose", "terrain"];
 
 // Personnel APSIG : mêmes identifiants et même double authentification que la centrale.
 export default function Connexion() {

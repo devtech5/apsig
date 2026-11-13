@@ -24,6 +24,7 @@ const PREMIER_CODE_COURT = 30_000;
 
 const inclusFoyer = {
   quartier: { include: { ville: true, commune: true } },
+  recensePar: { select: { nom: true } },
   membres: { include: { acces: { where: { revoqueLe: null }, orderBy: { creeLe: "desc" } } } },
   contacts: { orderBy: { ordre: "asc" } },
   supports: { orderBy: { creeLe: "asc" }, include: { membre: true, pose: { include: { agent: { select: { nom: true } }, photos: { select: { nature: true } } } } } },
@@ -520,6 +521,7 @@ export class AbonnementsService {
       position: f.lat != null && f.lng != null ? { lat: f.lat, lng: f.lng } : null,
       adresseVerifiee: f.adresseVerifiee,
       rccm: f.rccm,
+      recensePar: f.recensePar?.nom ?? null,
       creeLe: f.creeLe,
       membres: [...f.membres]
         .sort((a, b) => ORDRE_ROLE[a.role] - ORDRE_ROLE[b.role] || a.prenom.localeCompare(b.prenom))

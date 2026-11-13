@@ -99,6 +99,16 @@ Les inscriptions en ligne (`code-secours.apsig.online`, `apps/inscription`) dép
 1. **Recensement** par un agent de terrain (centrale web `/recensement`, puis application mobile) : type de client ; pour une entreprise ou une autre organisation, numéro du registre du commerce (RCCM) ; nom, prénoms, téléphone 1, téléphone 2 (facultatif), ville / commune / quartier du référentiel APSIG, adresse ou repère le plus précis possible ; encaissement des 10 000 F ou « pas encore payé ». À la validation, le **code Code-Secours** (code de la plaque, `DAL-LOBIA-053`) et les **QR** (plaque et intérieur) sont générés.
 2. **Pose de la plaque** (centrale web `/pose`), qui conclut l'inscription : code de la plaque, personne à contacter (nom et prénoms du représentant présent), position GPS relevée sur place **à 5 m près**, photo de la plaque posée et photo de la remise des codes QR. Les preuves sont visibles dans la fiche du foyer.
 
+**Accès terrain** (décidés le 13/11/2026) :
+
+| Rôle | Recensement (étape 1) | Pose (étape 2) | Équipe | Connexion |
+|---|---|---|---|---|
+| **Recenseur** | ses propres clients seulement | non | non | téléphone + mot de passe, sans double authentification |
+| **Poseur de plaques** | oui | oui ; le code de la plaque indique le recenseur | non | e-mail + mot de passe + double authentification |
+| **Chef d'équipe terrain** | oui | oui | crée et gère les comptes de ses recenseurs, suit recensés / payés / plaques posées | e-mail + mot de passe + double authentification |
+| **Administrateur** | oui | oui | tout le terrain ; crée tous les comptes, rattache un recenseur à un chef | e-mail + mot de passe + double authentification |
+
+
 Un abonnement expiré ne bloque jamais une urgence.
 
 Prestations payantes : ambulance (20 000 F abonné), IDE à domicile (5 000 F jour / 7 000 F nuit).

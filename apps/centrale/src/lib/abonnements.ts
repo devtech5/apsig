@@ -68,6 +68,7 @@ export type Foyer = {
   position: Position | null;
   adresseVerifiee: boolean;
   rccm: string | null;
+  recensePar: string | null;
   creeLe: string;
   membres: Membre[];
   contacts: Contact[];

@@ -10,6 +10,8 @@ type Plaque = {
   statut: string;
   foyer: { libelle: string; adresse: string | null; quartier: string; ville: string; adresseVerifiee: boolean } | null;
   titulaire: { prenom: string; nom: string; telephone: string | null } | null;
+  recenseur: { nom: string; telephone: string | null } | null;
+  recenseLe: string | null;
   pose: { le: string; agent: string; precisionM: number | null } | null;
   precisionRequiseM: number;
 };
@@ -209,6 +211,13 @@ function Conclusion({ plaque, onFaite }: { plaque: Plaque; onFaite: (p: Plaque) 
               {plaque.foyer.adresse && ` · ${plaque.foyer.adresse}`}
             </p>
             {plaque.titulaire?.telephone && <p className="text-sm">Tél. {plaque.titulaire.telephone}</p>}
+            {plaque.recenseur && (
+              <p className="text-sm text-attenue">
+                Recensé par {plaque.recenseur.nom}
+                {plaque.recenseur.telephone && ` (${plaque.recenseur.telephone})`}
+                {plaque.recenseLe && ` le ${dateHeure(plaque.recenseLe)}`}
+              </p>
+            )}
           </>
         ) : (
           <p className="text-sm text-danger">Cette plaque n'est rattachée à aucun client : voir la centrale avant de la poser.</p>

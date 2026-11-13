@@ -38,6 +38,7 @@ export function FicheFoyer({ f, referentiel, agir, envoi }: { f: Foyer; referent
             {f.quartier.nom}, {f.ville.nom}
             {f.adresse && ` · ${f.adresse}`}
             {f.rccm && ` · RCCM ${f.rccm}`}
+            {f.recensePar && ` · recensé par ${f.recensePar}`}
           </p>
           <p className="mt-1 flex flex-wrap gap-1.5 text-xs font-semibold">
             <span className={`rounded px-2 py-0.5 ${f.adresseVerifiee ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>

@@ -100,10 +100,10 @@ describe("Accès au back-office", () => {
     expect(connexion.status).toBe(403);
   });
 
-  it("cantonne l'agent de pose à la pose des supports (application mobile)", async () => {
+  it("cantonne le poseur au recensement et à la pose des plaques", async () => {
     const { agent, connexion } = await connecter("AGENT");
     expect(connexion.status).toBe(200);
-    expect((await agent.get("/compte").expect(200)).body.espaces).toEqual(["pose"]);
+    expect((await agent.get("/compte").expect(200)).body.espaces).toEqual(["recensement", "pose"]);
     await agent.get("/centrale/alertes").expect(403);
     await agent.get("/abonnements/foyers").expect(403);
   });
@@ -113,11 +113,11 @@ describe("Accès au back-office", () => {
     expect((await op.agent.get("/compte").expect(200)).body).toMatchObject({ id: op.utilisateur.id, role: "OPERATEUR", espaces: ["centrale"] });
 
     const conseiller = await connecter("CONSEILLER");
-    expect((await conseiller.agent.get("/compte").expect(200)).body.espaces).toEqual(["abonnements", "pose"]);
+    expect((await conseiller.agent.get("/compte").expect(200)).body.espaces).toEqual(["abonnements", "recensement", "pose"]);
     await conseiller.agent.get("/centrale/alertes").expect(403);
 
     const superadmin = await connecter("SUPERADMIN");
-    expect((await superadmin.agent.get("/compte").expect(200)).body.espaces).toEqual(["centrale", "supervision", "abonnements", "administration", "pose"]);
+    expect((await superadmin.agent.get("/compte").expect(200)).body.espaces).toEqual(["centrale", "supervision", "abonnements", "administration", "recensement", "pose", "equipe"]);
 
     const intervenant = await connecter("INTERVENANT");
     expect((await intervenant.agent.get("/compte").expect(200)).body.espaces).toEqual(["terrain"]);

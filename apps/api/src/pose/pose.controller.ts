@@ -1,6 +1,6 @@
 import { Body, Controller, Get, GoneException, Injectable, Module, NotFoundException, Param, Post, UnprocessableEntityException, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { estFixe, SUPPORTS } from "@apsig/domain";
+import { estEmailTerrain, estFixe, SUPPORTS, telephoneDeEmail } from "@apsig/domain";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
@@ -89,7 +89,15 @@ export class PoseService {
     if (!s || s.type !== "PORTAIL") throw new NotFoundException("Aucune plaque ne porte ce code : vérifiez-le");
     const vue = await this.support(s.jeton);
     const titulaire = s.foyerId ? await this.db.membre.findFirst({ where: { foyerId: s.foyerId, role: "TITULAIRE" } }) : null;
-    return { ...vue, titulaire: titulaire && { prenom: titulaire.prenom, nom: titulaire.nom, telephone: titulaire.telephone } };
+    // Le code de la plaque dit qui a recensé le client (commission, suivi de l'équipe).
+    const foyer = s.foyerId ? await this.db.foyer.findUnique({ where: { id: s.foyerId }, include: { recensePar: { select: { nom: true, email: true } } } }) : null;
+    const r = foyer?.recensePar;
+    return {
+      ...vue,
+      titulaire: titulaire && { prenom: titulaire.prenom, nom: titulaire.nom, telephone: titulaire.telephone },
+      recenseur: r && { nom: r.nom, telephone: estEmailTerrain(r.email) ? telephoneDeEmail(r.email) : null },
+      recenseLe: foyer?.creeLe ?? null,
+    };
   }
 
   // Conclusion de l'inscription : GPS à 5 m près, personne présente, photos de la plaque posée et de la remise des QR.

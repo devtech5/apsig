@@ -11,6 +11,8 @@ type CompteAdmin = {
   id: string;
   nom: string;
   email: string;
+  identifiant: string;
+  chef: { id: string; nom: string } | null;
   role: Role;
   actif: boolean;
   deuxFacteurs: boolean;
@@ -47,6 +49,7 @@ export default function PageAdministration() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const rolesPermis = ROLES.filter((r) => peutGererRole(compte.role, r));
+  const [roleNouveau, setRoleNouveau] = useState<Role>("OPERATEUR");
 
   const [unites, setUnites] = useState<UniteAdmin[] | null>(null);
   const charger = useCallback(() => appelApi<CompteAdmin[]>("/administration/comptes").then(setComptes, (e: Error) => setErreur(e.message)), []);
@@ -69,21 +72,28 @@ export default function PageAdministration() {
     }
   }
 
+  const chefs = comptes?.filter((c) => c.role === "CHEF_EQUIPE" && c.actif) ?? [];
+
   async function creer(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const d = new FormData(form);
     const r = await executer(() =>
-      appelApi<{ compte: { email: string }; motDePasse: string }>("/administration/comptes", { nom: valeur(d, "nom"), email: valeur(d, "email"), role: d.get("role") }),
+      appelApi<{ compte: { identifiant: string }; motDePasse: string }>(
+        "/administration/comptes",
+        roleNouveau === "RECENSEUR"
+          ? { nom: valeur(d, "nom"), telephone: valeur(d, "telephone"), role: roleNouveau, chefId: valeur(d, "chefId") }
+          : { nom: valeur(d, "nom"), email: valeur(d, "email"), role: roleNouveau },
+      ),
     );
     if (r) {
-      setSecret({ pour: r.compte.email, motDePasse: r.motDePasse });
+      setSecret({ pour: r.compte.identifiant, motDePasse: r.motDePasse });
       form.reset();
       void charger();
     }
   }
 
-  const modifier = (c: CompteAdmin, corps: Partial<Pick<CompteAdmin, "role" | "actif">> & { uniteId?: string | null }) =>
+  const modifier = (c: CompteAdmin, corps: Partial<Pick<CompteAdmin, "role" | "actif">> & { uniteId?: string | null; chefId?: string | null }) =>
     executer(async () => {
       setComptes(await appelApi<CompteAdmin[]>(`/administration/comptes/${c.id}`, corps, "PATCH"));
       if (corps.uniteId !== undefined) void chargerUnites();
@@ -107,7 +117,7 @@ export default function PageAdministration() {
     if (!confirm(`Réinitialiser le mot de passe de ${c.nom} ? Ses sessions seront fermées et la double authentification sera à refaire.`)) return;
     const r = await executer(() => appelApi<{ motDePasse: string }>(`/administration/comptes/${c.id}/reinitialiser`, {}));
     if (r) {
-      setSecret({ pour: c.email, motDePasse: r.motDePasse });
+      setSecret({ pour: c.identifiant, motDePasse: r.motDePasse });
       void charger();
     }
   }
@@ -139,11 +149,17 @@ export default function PageAdministration() {
           <Champ libelle="Nom">
             <input name="nom" required minLength={2} maxLength={80} className={CHAMP} />
           </Champ>
-          <Champ libelle="E-mail">
-            <input name="email" type="email" required maxLength={120} className={CHAMP} />
-          </Champ>
+          {roleNouveau === "RECENSEUR" ? (
+            <Champ libelle="Téléphone (identifiant de connexion)">
+              <input name="telephone" type="tel" inputMode="tel" required pattern="\+?[0-9 .\-]{10,20}" placeholder="07 00 00 00 00" className={CHAMP} />
+            </Champ>
+          ) : (
+            <Champ libelle="E-mail">
+              <input name="email" type="email" required maxLength={120} className={CHAMP} />
+            </Champ>
+          )}
           <Champ libelle="Rôle">
-            <select name="role" defaultValue="OPERATEUR" className={CHAMP}>
+            <select name="role" value={roleNouveau} onChange={(e) => setRoleNouveau(e.target.value as Role)} className={CHAMP}>
               {rolesPermis.map((r) => (
                 <option key={r} value={r}>
                   {LIBELLES_ROLE[r]}
@@ -151,10 +167,25 @@ export default function PageAdministration() {
               ))}
             </select>
           </Champ>
+          {roleNouveau === "RECENSEUR" && (
+            <Champ libelle="Chef d'équipe">
+              <select name="chefId" defaultValue="" className={CHAMP}>
+                <option value="">Aucun</option>
+                {chefs.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nom}
+                  </option>
+                ))}
+              </select>
+            </Champ>
+          )}
           <button disabled={envoi} className={BOUTON}>
             Créer
           </button>
         </form>
+        {roleNouveau === "RECENSEUR" && (
+          <p className="mt-2 text-xs text-attenue">Le recenseur se connecte avec son téléphone et son mot de passe, sans application d'authentification. Il ne voit que les clients qu'il a recensés.</p>
+        )}
       </Bloc>
 
       <Bloc titre={`Comptes${comptes ? ` (${comptes.length})` : ""}`}>
@@ -175,7 +206,7 @@ export default function PageAdministration() {
                   <td className="py-2">
                     <span className="font-semibold">{c.nom}</span>
                     {c.id === compte.id && <span className="ml-1 text-xs text-attenue">(vous)</span>}
-                    <span className="block text-xs text-attenue">{c.email}</span>
+                    <span className="block text-xs text-attenue">{c.identifiant}</span>
                   </td>
                   <td className="py-2">
                     {c.gerable && c.actif ? (
@@ -195,6 +226,25 @@ export default function PageAdministration() {
                     ) : (
                       LIBELLES_ROLE[c.role]
                     )}
+                    {c.role === "RECENSEUR" &&
+                      (c.gerable && c.actif ? (
+                        <select
+                          value={c.chef?.id ?? ""}
+                          disabled={envoi}
+                          onChange={(e) => void modifier(c, { chefId: e.target.value || null })}
+                          className="mt-1 block rounded border border-ligne bg-white px-2 py-1 text-xs"
+                          aria-label={`Chef d'équipe de ${c.nom}`}
+                        >
+                          <option value="">Sans chef d'équipe</option>
+                          {chefs.map((ch) => (
+                            <option key={ch.id} value={ch.id}>
+                              {ch.nom}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        c.chef && <span className="block text-xs text-attenue">Équipe de {c.chef.nom}</span>
+                      ))}
                     {c.role === "INTERVENANT" &&
                       (c.gerable && c.actif ? (
                         <select

@@ -12,7 +12,7 @@ export const auth = createAuthClient({
   plugins: [expoClient({ scheme: "apsig", storagePrefix: "apsig", storage: SecureStore }), twoFactorClient()],
 });
 
-export type Espace = "centrale" | "supervision" | "abonnements" | "administration" | "pose" | "terrain";
+export type Espace = "centrale" | "supervision" | "abonnements" | "administration" | "recensement" | "pose" | "equipe" | "terrain";
 export type ComptePersonnel = { id: string; nom: string; email: string; role: string; espaces: Espace[]; deuxFacteursRequis: boolean };
 
 // Appel de l'API avec la session du personnel.

@@ -10,7 +10,7 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 const API_URL = (process.env.CENTRALE_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
 // Routes du back-office exposées par l'API, une par espace (cf. apps/api).
-const ROUTES_API = ["compte", "centrale", "supervision", "abonnements", "administration", "pose"];
+const ROUTES_API = ["compte", "centrale", "supervision", "abonnements", "administration", "pose", "equipe"];
 
 const config: NextConfig = {
   // Image Docker légère : serveur autonome, dépendances du monorepo tracées depuis la racine.

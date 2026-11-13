@@ -134,9 +134,11 @@ export class RecensementService {
   }
 }
 
+// Routes sous /pose (l'application mobile les appelle déjà) mais ouvertes à l'espace Recensement : le recenseur y a accès,
+// pas à la pose des plaques.
 @Controller("pose")
 @UseGuards(BackOfficeGuard)
-@EspaceRequis("pose")
+@EspaceRequis("recensement")
 export class RecensementController {
   constructor(private readonly service: RecensementService) {}
 

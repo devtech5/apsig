@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aAcces, peutGererRole } from "../src/index.ts";
+import { aAcces, deuxFacteursExige, emailTerrain, peutGererRole, telephoneDeEmail } from "../src/index.ts";
 
 describe("Espaces du back-office", () => {
   it("chaque rôle n'ouvre que ses espaces", () => {
@@ -17,5 +17,31 @@ describe("Espaces du back-office", () => {
     expect(peutGererRole("ADMIN", "SUPERADMIN")).toBe(false);
     expect(peutGererRole("SUPERADMIN", "ADMIN")).toBe(true);
     expect(peutGererRole("SUPERVISEUR", "OPERATEUR")).toBe(false);
+  });
+});
+
+describe("Accès terrain", () => {
+  it("recenseur : recensement seulement ; poseur : recensement et pose ; chef d'équipe : équipe en plus", () => {
+    expect(aAcces("RECENSEUR", "recensement")).toBe(true);
+    expect(aAcces("RECENSEUR", "pose")).toBe(false);
+    expect(aAcces("RECENSEUR", "abonnements")).toBe(false);
+    expect(aAcces("AGENT", "pose")).toBe(true);
+    expect(aAcces("AGENT", "recensement")).toBe(true);
+    expect(aAcces("AGENT", "equipe")).toBe(false);
+    expect(aAcces("CHEF_EQUIPE", "equipe")).toBe(true);
+    expect(aAcces("CHEF_EQUIPE", "administration")).toBe(false);
+  });
+
+  it("seul le recenseur se passe de la double authentification", () => {
+    expect(deuxFacteursExige("RECENSEUR")).toBe(false);
+    expect(deuxFacteursExige("AGENT")).toBe(true);
+    expect(deuxFacteursExige("CHEF_EQUIPE")).toBe(true);
+  });
+
+  it("le téléphone donne un identifiant de connexion stable", () => {
+    expect(emailTerrain("07 08 09 10 11")).toBe("2250708091011@terrain.apsig.ci");
+    expect(emailTerrain("+225 0708091011")).toBe("2250708091011@terrain.apsig.ci");
+    expect(emailTerrain("1234")).toBeNull();
+    expect(telephoneDeEmail("2250708091011@terrain.apsig.ci")).toBe("07 08 09 10 11");
   });
 });

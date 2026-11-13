@@ -15,7 +15,7 @@ import {
 import { Reflector } from "@nestjs/core";
 import type { IncomingMessage } from "node:http";
 import { fromNodeHeaders } from "better-auth/node";
-import { aAcces, ESPACES, LIBELLES_ESPACE, type Espace, type Role } from "@apsig/domain";
+import { aAcces, deuxFacteursExige, ESPACES, LIBELLES_ESPACE, type Espace, type Role } from "@apsig/domain";
 import { config } from "../config.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
 import { type Auth, creerAuth } from "./auth.ts";
@@ -62,7 +62,7 @@ export class BackOfficeGuard implements CanActivate {
     const espace = this.reflector.getAllAndOverride<Espace | undefined>(ESPACE_REQUIS, cibles);
     // Les agents de pose n'ont aucun espace dans le back-office.
     if (!actif || !espacesDe(role).length) throw new ForbiddenException("Accès réservé aux équipes APSIG");
-    if (config.deuxFacteursObligatoire && !deuxFacteurs && !this.reflector.getAllAndOverride<boolean>(AVANT_DEUX_FACTEURS, cibles)) {
+    if (config.deuxFacteursObligatoire && deuxFacteursExige(role) && !deuxFacteurs && !this.reflector.getAllAndOverride<boolean>(AVANT_DEUX_FACTEURS, cibles)) {
       throw new ForbiddenException(DEUX_FACTEURS_REQUIS);
     }
     if (espace && !aAcces(role, espace)) throw new ForbiddenException(`Accès réservé à l'espace ${LIBELLES_ESPACE[espace]}`);
@@ -82,7 +82,7 @@ export class CompteController {
   @Get()
   @AvantDeuxFacteurs()
   moi(@Utilisateur() u: UtilisateurConnecte) {
-    return { ...u, espaces: espacesDe(u.role), deuxFacteursRequis: config.deuxFacteursObligatoire && !u.deuxFacteurs };
+    return { ...u, espaces: espacesDe(u.role), deuxFacteursRequis: config.deuxFacteursObligatoire && deuxFacteursExige(u.role) && !u.deuxFacteurs };
   }
 }
 

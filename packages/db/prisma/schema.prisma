@@ -397,10 +397,12 @@ model Unite {
 // OPERATEUR (call center), SUPERVISEUR (équipe, répartition, statistiques), ADMIN (comptes, paramètres),
 // SUPERADMIN (propriétaire : administrateurs, audit complet).
 enum RoleUtilisateur {
-  AGENT
+  RECENSEUR // inscrit les clients sur le terrain (étape 1), se connecte par téléphone
+  AGENT // poseur de plaques (étape 2)
   INTERVENANT // membre d'une unité terrain (application mobile)
   CONSEILLER
   OPERATEUR
+  CHEF_EQUIPE // suit ses recenseurs et crée leurs comptes
   SUPERVISEUR
   ADMIN
   SUPERADMIN
@@ -422,6 +424,10 @@ model Utilisateur {
   emailVerifie Boolean       @default(false)
   image      String?
   role       RoleUtilisateur
+  // Terrain : chef d'équipe du recenseur (qui l'a inscrit et le suit).
+  chefId     String?
+  chef       Utilisateur?    @relation("Equipe", fields: [chefId], references: [id])
+  equipe     Utilisateur[]   @relation("Equipe")
   uniteId    String?
   unite      Unite?          @relation(fields: [uniteId], references: [id])
   actif      Boolean         @default(true)
@@ -442,6 +448,8 @@ model Utilisateur {
   alertesAttribuees Alerte[] @relation("Attribution")
   evenements EvenementAlerte[]
   audit      Audit[]
+
+  @@index([chefId])
 }
 
 // Tables internes de Better Auth : noms de champs imposés par la bibliothèque.

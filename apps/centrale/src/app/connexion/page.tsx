@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { emailTerrain } from "@apsig/domain";
 import { appelApi, ErreurApi } from "@/lib/api";
 
 const CHAMP = "rounded-lg border border-ligne px-3 py-2 font-normal";
@@ -19,7 +20,15 @@ export default function Connexion() {
     setEnvoi(true);
     setErreur(null);
     try {
-      const r = await appelApi<{ twoFactorRedirect?: boolean }>("/auth/sign-in/email", { email: champs.get("email"), password: champs.get("motDePasse") });
+      // Les recenseurs se connectent avec leur téléphone : il donne l'identifiant de leur compte.
+      const saisi = String(champs.get("identifiant") ?? "").trim();
+      const email = saisi.includes("@") ? saisi : emailTerrain(saisi);
+      if (!email) {
+        setErreur("Saisissez votre e-mail ou votre numéro de téléphone (10 chiffres)");
+        setEnvoi(false);
+        return;
+      }
+      const r = await appelApi<{ twoFactorRedirect?: boolean }>("/auth/sign-in/email", { email, password: champs.get("motDePasse") });
       if (r.twoFactorRedirect) {
         setCode("totp");
         setEnvoi(false);
@@ -28,7 +37,7 @@ export default function Connexion() {
       const statut = err instanceof ErreurApi ? err.statut : 0;
       // Un 403 sans compte désactivé : l'API ne reconnaît pas l'adresse de la centrale (CENTRALE_URL).
       setErreur(
-        statut === 401 ? "E-mail ou mot de passe incorrect"
+        statut === 401 ? "Identifiant ou mot de passe incorrect"
         : statut === 403 && err instanceof Error && err.message === "Ce compte est désactivé" ? "Ce compte est désactivé"
         : statut === 403 ? "Connexion refusée par le serveur : adresse de la centrale non autorisée (CENTRALE_URL)"
         : statut === 429 ? "Trop de tentatives. Réessayez dans une minute"
@@ -72,8 +81,8 @@ export default function Connexion() {
         {!code ? (
           <form onSubmit={seConnecter} className="grid gap-4">
             <label className="grid gap-1 text-sm font-semibold">
-              E-mail
-              <input name="email" type="email" autoComplete="username" required className={CHAMP} />
+              E-mail ou téléphone
+              <input name="identifiant" type="text" inputMode="email" autoComplete="username" autoCapitalize="none" required className={CHAMP} />
             </label>
             <label className="grid gap-1 text-sm font-semibold">
               Mot de passe

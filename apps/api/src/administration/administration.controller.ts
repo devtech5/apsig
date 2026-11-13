@@ -5,12 +5,22 @@ import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } 
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { AdministrationService } from "./administration.service.ts";
 
-const creation = z.object({ nom: z.string().trim().min(2).max(80), email: z.string().trim().email().max(120), role: z.enum(ROLES) });
+// Recenseur : connexion par téléphone (sans e-mail) ; les autres comptes se connectent par e-mail.
+const creation = z
+  .object({
+    nom: z.string().trim().min(2).max(80),
+    email: z.string().trim().email().max(120).optional(),
+    telephone: z.string().trim().max(20).optional(),
+    role: z.enum(ROLES),
+    chefId: z.string().min(1).nullable().optional(),
+  })
+  .refine((d) => (d.role === "RECENSEUR" ? d.telephone : d.email), { message: "E-mail requis (téléphone pour un recenseur)", path: ["email"] });
 const modification = z.object({
   nom: z.string().trim().min(2).max(80).optional(),
   role: z.enum(ROLES).optional(),
   actif: z.boolean().optional(),
   uniteId: z.string().min(1).nullable().optional(),
+  chefId: z.string().min(1).nullable().optional(),
 });
 const unite = z.object({ nom: z.string().trim().min(2).max(60), type: z.enum(TYPES_UNITE), statut: z.enum(STATUTS_UNITE).optional() });
 const journal = z.object({ action: z.string().trim().max(40).optional(), page: z.coerce.number().int().min(1).max(10_000).default(1) });
