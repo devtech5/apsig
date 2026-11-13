@@ -14,10 +14,13 @@ export const VILLES_CI = [
   "Toulépleu", "Toumodi", "Transua", "Vavoua", "Yakassé-Attobrou", "Yamoussoukro", "Zouan-Hounien", "Zoukougbeu", "Zuénoula",
 ] as const;
 
-// Communes connues d'avance : les dix communes de la ville d'Abidjan. Ailleurs, la commune est facultative
-// et s'ajoute au besoin.
+// Communes connues d'avance : les treize communes du district autonome d'Abidjan. Ailleurs, la ville est elle-même
+// la commune : le champ est facultatif et une commune s'ajoute au besoin.
 export const COMMUNES_CI: Readonly<Record<string, readonly string[]>> = {
-  Abidjan: ["Abobo", "Adjamé", "Attécoubé", "Cocody", "Koumassi", "Marcory", "Plateau", "Port-Bouët", "Treichville", "Yopougon"],
+  Abidjan: [
+    "Abobo", "Adjamé", "Anyama", "Attécoubé", "Bingerville", "Cocody", "Koumassi",
+    "Marcory", "Plateau", "Port-Bouët", "Songon", "Treichville", "Yopougon",
+  ],
 };
 
 // Clé de comparaison : « Port-Bouët », « port bouet » et « PORT-BOUET » désignent le même lieu.

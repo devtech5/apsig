@@ -16,6 +16,7 @@ import {
 } from "@apsig/domain";
 import { BOUTON, CHAMP, Champ, Erreur } from "@/components/Formulaire";
 import { Icone } from "@/components/Icone";
+import { ListeSaisie } from "@/components/ListeSaisie";
 import { appelApi } from "@/lib/api";
 import { dateHeure } from "@/lib/format";
 
@@ -183,7 +184,6 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
   const villeConnue = villes.find((v) => cle(v.nom) === cle(ville));
   const communes = villeConnue?.communes ?? [];
   const quartiers = (villeConnue?.quartiers ?? []).filter((q) => !commune.trim() || !q.commune || cle(q.commune) === cle(commune));
-  const nouveau = (valeur: string, liste: string[]) => valeur.trim() !== "" && !liste.some((n) => cle(n) === cle(valeur));
 
   async function enregistrer(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -257,65 +257,32 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
       <section className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm">
         <h2 className="text-xs font-bold tracking-wide text-attenue uppercase">Lieu</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Champ libelle="Ville" aide={nouveau(ville, villes.map((v) => v.nom)) ? "Ville absente de la liste : elle sera ajoutée." : undefined}>
-            <input
-              list="villes-ci"
-              value={ville}
-              onChange={(e) => {
-                setVille(e.target.value);
-                setCommune("");
-                setQuartier("");
-              }}
-              required
-              maxLength={80}
-              autoComplete="off"
-              placeholder="Choisir ou saisir"
-              className={CHAMP}
-            />
-            <datalist id="villes-ci">
-              {villes.map((v) => (
-                <option key={v.nom} value={v.nom} />
-              ))}
-            </datalist>
-          </Champ>
-          <Champ libelle={communes.length ? "Commune" : "Commune (facultatif)"} aide={nouveau(commune, communes) ? "Commune absente : elle sera ajoutée." : undefined}>
-            <input
-              list="communes-ville"
-              value={commune}
-              onChange={(e) => {
-                setCommune(e.target.value);
-                setQuartier("");
-              }}
-              required={communes.length > 0}
-              maxLength={80}
-              autoComplete="off"
-              placeholder={communes.length ? "Choisir ou saisir" : "—"}
-              className={CHAMP}
-            />
-            <datalist id="communes-ville">
-              {communes.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-          </Champ>
-        </div>
-        <Champ libelle="Quartier" aide={nouveau(quartier, quartiers.map((q) => q.nom)) ? "Quartier absent de la liste : il sera ajouté." : undefined}>
-          <input
-            list="quartiers-ville"
-            value={quartier}
-            onChange={(e) => setQuartier(e.target.value)}
-            required
-            maxLength={80}
-            autoComplete="off"
-            placeholder="Choisir ou saisir"
-            className={CHAMP}
+          <ListeSaisie
+            libelle="Ville"
+            valeur={ville}
+            options={villes.map((v) => v.nom)}
+            onChange={(v) => {
+              setVille(v);
+              setCommune("");
+              setQuartier("");
+            }}
+            requis
+            ajout="elle sera ajoutée"
           />
-          <datalist id="quartiers-ville">
-            {quartiers.map((q) => (
-              <option key={`${q.commune}-${q.nom}`} value={q.nom} />
-            ))}
-          </datalist>
-        </Champ>
+          <ListeSaisie
+            libelle={communes.length ? "Commune" : "Commune (facultatif)"}
+            valeur={commune}
+            options={communes}
+            onChange={(c) => {
+              setCommune(c);
+              setQuartier("");
+            }}
+            requis={communes.length > 0}
+            placeholder={communes.length ? "Choisir ou saisir" : "Saisir si besoin"}
+            ajout="elle sera ajoutée"
+          />
+        </div>
+        <ListeSaisie libelle="Quartier" valeur={quartier} options={quartiers.map((q) => q.nom)} onChange={setQuartier} requis />
         <Champ libelle="Adresse ou repère" aide="Soyez le plus précis possible : c'est ce qui permet de retrouver la maison pour poser la plaque.">
           <textarea name="adresse" required minLength={5} maxLength={300} rows={2} placeholder="Villa 453, portail bleu, 2e rue après la pharmacie du marché…" className={CHAMP} />
         </Champ>
