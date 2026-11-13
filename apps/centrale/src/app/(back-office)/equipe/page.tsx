@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { LIBELLES_ROLE, type Role } from "@apsig/domain";
+import { cleLieu, LIBELLES_ROLE, type Role } from "@apsig/domain";
+import { ListeSaisie } from "@/components/ListeSaisie";
 import { Bloc, BOUTON, BOUTON_DISCRET, CHAMP, Champ, Erreur, valeur } from "@/components/Formulaire";
 import { useSession } from "@/components/Session";
 import { appelApi } from "@/lib/api";
@@ -15,6 +16,7 @@ type Membre = {
   actif: boolean;
   chef: string | null;
   gerable: boolean;
+  zones: Zone[];
   recenses: number;
   payes: number;
   plaquesPosees: number;
@@ -25,6 +27,8 @@ type Tableau = {
   recensements: { id: string; code: string | null; client: string; lieu: string; recenseur: string | null; paye: boolean; posee: boolean; creeLe: string }[];
 };
 type Secret = { pour: string; motDePasse: string };
+type Zone = { ville: string; commune: string | null };
+type Ville = { nom: string; communes: string[] };
 
 // Équipe terrain : le chef d'équipe inscrit ses recenseurs et suit leur travail ; l'administration voit tout le terrain.
 export default function PageEquipe() {
@@ -35,8 +39,12 @@ export default function PageEquipe() {
   const [envoi, setEnvoi] = useState(false);
   const admin = compte.espaces.includes("administration");
 
+  const [villes, setVilles] = useState<Ville[]>([]);
   const charger = useCallback(() => {
     appelApi<Tableau>("/equipe").then(setTableau, (e: Error) => setErreur(e.message));
+  }, []);
+  useEffect(() => {
+    appelApi<Ville[]>("/pose/referentiel").then(setVilles, () => undefined);
   }, []);
   useEffect(charger, [charger]);
 
@@ -58,7 +66,7 @@ export default function PageEquipe() {
     const form = e.currentTarget;
     const d = new FormData(form);
     const r = await executer(() =>
-      appelApi<{ compte: { identifiant: string }; motDePasse: string }>("/equipe/recenseurs", { nom: valeur(d, "nom"), telephone: valeur(d, "telephone") }),
+      appelApi<{ compte: { identifiant: string }; motDePasse: string }>("/equipe/membres", { nom: valeur(d, "nom"), telephone: valeur(d, "telephone"), role: d.get("role") }),
     );
     if (r) {
       setSecret({ pour: r.compte.identifiant, motDePasse: r.motDePasse });
@@ -67,8 +75,40 @@ export default function PageEquipe() {
     }
   }
 
+  const actionsDe = (m: Membre) => (
+    m.gerable && (
+      <span className="flex justify-end gap-1">
+        {m.actif && (
+          <button
+            disabled={envoi}
+            className={BOUTON_DISCRET}
+            onClick={() =>
+              confirm(`Nouveau mot de passe pour ${m.nom} ? L'ancien ne fonctionnera plus.`) &&
+              void executer(() => appelApi<{ motDePasse: string }>(`/equipe/membres/${m.id}/reinitialiser`, {})).then(
+                (r) => r && setSecret({ pour: m.identifiant, motDePasse: r.motDePasse }),
+              )
+            }
+          >
+            Nouveau mot de passe
+          </button>
+        )}
+        <button
+          disabled={envoi}
+          className={BOUTON_DISCRET}
+          onClick={() =>
+            (m.actif ? confirm(`Désactiver le compte de ${m.nom} ? Il sera déconnecté aussitôt.`) : true) &&
+            void executer(() => appelApi<Tableau>(`/equipe/membres/${m.id}`, { actif: !m.actif }, "PATCH")).then((t) => t && setTableau(t))
+          }
+        >
+          {m.actif ? "Désactiver" : "Réactiver"}
+        </button>
+      </span>
+    )
+  );
+
   const recenseurs = tableau?.membres.filter((m) => m.role === "RECENSEUR") ?? [];
-  const autres = tableau?.membres.filter((m) => m.role !== "RECENSEUR") ?? [];
+  const poseurs = tableau?.membres.filter((m) => m.role === "AGENT") ?? [];
+  const chefs = tableau?.membres.filter((m) => m.role === "CHEF_EQUIPE") ?? [];
   const totaux = recenseurs.reduce((t, m) => ({ recenses: t.recenses + m.recenses, payes: t.payes + m.payes, posees: t.posees + m.plaquesPosees }), { recenses: 0, payes: 0, posees: 0 });
 
   return (
@@ -94,21 +134,28 @@ export default function PageEquipe() {
         </div>
       )}
 
-      <Bloc titre="Inscrire un recenseur">
-        <form onSubmit={creer} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+      <Bloc titre="Inscrire un membre de l'équipe">
+        <form onSubmit={creer} className="grid gap-3 sm:grid-cols-[1fr_1fr_11rem_auto] sm:items-end">
           <Champ libelle="Nom et prénoms">
             <input name="nom" required minLength={2} maxLength={80} className={CHAMP} />
           </Champ>
           <Champ libelle="Téléphone (identifiant de connexion)">
             <input name="telephone" type="tel" inputMode="tel" required pattern="\+?[0-9 .\-]{10,20}" placeholder="07 00 00 00 00" className={CHAMP} />
           </Champ>
+          <Champ libelle="Rôle">
+            <select name="role" defaultValue="RECENSEUR" className={CHAMP}>
+              <option value="RECENSEUR">Recenseur</option>
+              <option value="AGENT">Poseur de plaques</option>
+            </select>
+          </Champ>
           <button disabled={envoi} className={BOUTON}>
             Créer le compte
           </button>
         </form>
         <p className="mt-2 text-xs text-attenue">
-          Le recenseur inscrit les clients (étape 1) et ne voit que les siens. Il n&apos;a accès ni à la pose des plaques, ni aux fiches des abonnés.
-          {admin && " Pour rattacher un recenseur à un chef d'équipe, utilisez la page Administration."}
+          Le recenseur inscrit les clients (étape 1) et ne voit que les siens. Le poseur pose les plaques (étape 2) chez les clients de ses communes : attribuez-lui
+          ses zones ci-dessous. Tous deux se connectent sur code-secours.apsig.online avec leur téléphone.
+          {admin && " Pour rattacher un membre à un chef d'équipe, utilisez la page Personnel du QG."}
         </p>
       </Bloc>
 
@@ -132,44 +179,12 @@ export default function PageEquipe() {
                 {recenseurs.map((m) => (
                   <tr key={m.id} className={`border-t border-ligne ${m.actif ? "" : "text-attenue"}`}>
                     <td className="py-2">
-                      <span className="font-semibold">{m.nom}</span>
-                      {!m.actif && <span className="ml-1 text-xs">(désactivé)</span>}
-                      <span className="block font-mono text-xs text-attenue">{m.identifiant}</span>
-                      {admin && m.chef && <span className="block text-xs text-attenue">Équipe de {m.chef}</span>}
+                      <Identite m={m} admin={admin} />
                     </td>
                     <td className="py-2 text-right font-mono">{m.recenses}</td>
                     <td className="py-2 text-right font-mono">{m.payes}</td>
                     <td className="py-2 text-right font-mono font-bold">{m.plaquesPosees}</td>
-                    <td className="py-2 text-right">
-                      {m.gerable && (
-                        <span className="flex justify-end gap-1">
-                          {m.actif && (
-                            <button
-                              disabled={envoi}
-                              className={BOUTON_DISCRET}
-                              onClick={() =>
-                                confirm(`Nouveau mot de passe pour ${m.nom} ? L'ancien ne fonctionnera plus.`) &&
-                                void executer(() => appelApi<{ motDePasse: string }>(`/equipe/membres/${m.id}/reinitialiser`, {})).then(
-                                  (r) => r && setSecret({ pour: m.identifiant, motDePasse: r.motDePasse }),
-                                )
-                              }
-                            >
-                              Nouveau mot de passe
-                            </button>
-                          )}
-                          <button
-                            disabled={envoi}
-                            className={BOUTON_DISCRET}
-                            onClick={() =>
-                              (m.actif ? confirm(`Désactiver le compte de ${m.nom} ? Il sera déconnecté aussitôt.`) : true) &&
-                              void executer(() => appelApi<Tableau>(`/equipe/membres/${m.id}`, { actif: !m.actif }, "PATCH")).then((t) => t && setTableau(t))
-                            }
-                          >
-                            {m.actif ? "Désactiver" : "Réactiver"}
-                          </button>
-                        </span>
-                      )}
-                    </td>
+                    <td className="py-2 text-right">{actionsDe(m)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -178,21 +193,44 @@ export default function PageEquipe() {
         </Bloc>
       )}
 
-      {admin && autres.length > 0 && (
-        <Bloc titre="Poseurs et chefs d'équipe">
+      {tableau && (
+        <Bloc titre={`Poseurs de plaques (${poseurs.length})`}>
+          {poseurs.length === 0 && <p className="text-sm text-attenue">Aucun poseur pour l&apos;instant.</p>}
+          <ul className="grid gap-3">
+            {poseurs.map((m) => (
+              <li key={m.id} className={`grid gap-2 border-t border-ligne pt-3 ${m.actif ? "" : "text-attenue"}`}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <Identite m={m} admin={admin} />
+                  <span className="text-sm">
+                    <strong className="font-mono">{m.posesEffectuees}</strong> plaque{m.posesEffectuees > 1 ? "s" : ""} posée{m.posesEffectuees > 1 ? "s" : ""}
+                  </span>
+                  {actionsDe(m)}
+                </div>
+                <Zones
+                  membre={m}
+                  villes={villes}
+                  modifiable={m.gerable && m.actif}
+                  onEnregistrer={(z) => executer(() => appelApi<Tableau>(`/equipe/membres/${m.id}/zones`, { zones: z }, "PUT")).then((t) => t && setTableau(t))}
+                />
+              </li>
+            ))}
+          </ul>
+        </Bloc>
+      )}
+
+      {admin && chefs.length > 0 && (
+        <Bloc titre={`Chefs d'équipe (${chefs.length})`}>
           <ul className="grid gap-1 text-sm">
-            {autres.map((m) => (
+            {chefs.map((m) => (
               <li key={m.id} className={`flex flex-wrap justify-between gap-2 border-t border-ligne py-1.5 ${m.actif ? "" : "text-attenue"}`}>
                 <span>
                   <span className="font-semibold">{m.nom}</span> · {LIBELLES_ROLE[m.role]}
                 </span>
-                <span className="text-attenue">
-                  {m.role === "AGENT" ? `${m.posesEffectuees} plaques posées` : `${m.recenses} clients recensés`}
-                </span>
+                <span className="text-attenue">{m.recenses} clients recensés</span>
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-xs text-attenue">Ces comptes se créent depuis la page Administration (e-mail et double authentification).</p>
+          <p className="mt-2 text-xs text-attenue">Les chefs d&apos;équipe se créent depuis la page Personnel du QG (e-mail et double authentification).</p>
         </Bloc>
       )}
 
@@ -216,6 +254,80 @@ export default function PageEquipe() {
             ))}
           </ul>
         </Bloc>
+      )}
+    </div>
+  );
+}
+
+function Identite({ m, admin }: { m: Membre; admin: boolean }) {
+  return (
+    <span>
+      <span className="font-semibold">{m.nom}</span>
+      {!m.actif && <span className="ml-1 text-xs">(désactivé)</span>}
+      <span className="block font-mono text-xs text-attenue">{m.identifiant}</span>
+      {admin && m.chef && <span className="block text-xs text-attenue">Équipe de {m.chef}</span>}
+    </span>
+  );
+}
+
+// Zones du poseur : communes (ou villes entières). Il ne voit que les clients à équiper dans ces zones.
+function Zones({ membre, villes, modifiable, onEnregistrer }: { membre: Membre; villes: Ville[]; modifiable: boolean; onEnregistrer: (z: Zone[]) => Promise<unknown> }) {
+  const [zones, setZones] = useState<Zone[]>(membre.zones);
+  const [ville, setVille] = useState("");
+  const [commune, setCommune] = useState("");
+  const [edition, setEdition] = useState(false);
+  useEffect(() => setZones(membre.zones), [membre.zones]);
+  const communes = villes.find((v) => cleLieu(v.nom) === cleLieu(ville))?.communes ?? [];
+  const libelle = (z: Zone) => (z.commune ? `${z.commune} (${z.ville})` : `${z.ville}, toute la ville`);
+
+  return (
+    <div className="grid gap-2 rounded-xl bg-fond p-3">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-semibold">Zones :</span>
+        {zones.length === 0 && <span className="text-danger">aucune, le poseur ne voit aucun client</span>}
+        {zones.map((z) => (
+          <span key={libelle(z)} className="flex items-center gap-1 rounded-lg bg-white px-2 py-1 ring-1 ring-ligne">
+            {libelle(z)}
+            {edition && (
+              <button type="button" aria-label={`Retirer ${libelle(z)}`} onClick={() => setZones((l) => l.filter((x) => x !== z))} className="text-attenue hover:text-danger">
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+        {modifiable && !edition && (
+          <button type="button" onClick={() => setEdition(true)} className={BOUTON_DISCRET}>
+            Modifier les zones
+          </button>
+        )}
+      </div>
+      {edition && (
+        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
+          <ListeSaisie libelle="Ville" valeur={ville} options={villes.map((v) => v.nom)} onChange={(v) => { setVille(v); setCommune(""); }} ajout="elle sera ajoutée" />
+          <ListeSaisie
+            libelle={communes.length ? "Commune" : "Commune (vide : toute la ville)"}
+            valeur={commune}
+            options={communes}
+            onChange={setCommune}
+            placeholder={communes.length ? "Choisir" : "Toute la ville"}
+            ajout="elle sera ajoutée"
+          />
+          <button
+            type="button"
+            disabled={!ville.trim() || (communes.length > 0 && !commune.trim())}
+            onClick={() => {
+              const z = { ville: ville.trim(), commune: commune.trim() || null };
+              if (!zones.some((x) => libelle(x) === libelle(z))) setZones((l) => [...l, z]);
+              setCommune("");
+            }}
+            className={BOUTON_DISCRET}
+          >
+            Ajouter
+          </button>
+          <button type="button" onClick={() => void onEnregistrer(zones).then(() => setEdition(false))} className={BOUTON}>
+            Enregistrer
+          </button>
+        </div>
       )}
     </div>
   );

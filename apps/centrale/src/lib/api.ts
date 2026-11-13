@@ -126,7 +126,7 @@ export class ErreurApi extends Error {
 }
 
 // /api/* est relayé vers l'API par next.config.ts (même origine : cookies de session first-party).
-export async function appelApi<T>(chemin: string, corps?: unknown, methode?: "POST" | "PATCH" | "DELETE"): Promise<T> {
+export async function appelApi<T>(chemin: string, corps?: unknown, methode?: "POST" | "PUT" | "PATCH" | "DELETE"): Promise<T> {
   let reponse: Response;
   try {
     reponse = await fetch(`/api${chemin}`, {

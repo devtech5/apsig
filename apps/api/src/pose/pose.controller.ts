@@ -1,5 +1,6 @@
 import { Body, Controller, Get, GoneException, Injectable, Module, NotFoundException, Param, Post, UnprocessableEntityException, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import type { Prisma } from "@apsig/db";
 import { estEmailTerrain, estFixe, SUPPORTS, telephoneDeEmail } from "@apsig/domain";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
@@ -131,19 +132,59 @@ export class PoseService {
     return this.plaque(s.code);
   }
 
-  // Tournée de l'agent : QR fixes actifs pas encore posés.
-  async aPoser() {
+  // Tournée du poseur : clients dont la plaque n'est pas encore posée, dans ses communes (ou villes entières).
+  // Chef d'équipe et QG : toutes les zones. Les plus anciens recensements d'abord.
+  async aPoser(u: UtilisateurConnecte) {
+    let zone: Prisma.QuartierWhereInput | undefined;
+    if (u.role === "AGENT") {
+      const zones = await this.db.zonePoseur.findMany({ where: { utilisateurId: u.id } });
+      if (zones.length === 0) return { zones: [], clients: [] };
+      zone = { OR: zones.map((z) => (z.communeId ? { communeId: z.communeId } : { villeId: z.villeId })) };
+    }
     const supports = await this.db.support.findMany({
-      where: { type: { in: ["PORTAIL", "INTERIEUR"] }, statut: { in: ["ACTIF", "STOCK"] }, pose: null, foyerId: { not: null } },
-      include: { foyer: { include: { quartier: { include: { ville: true } } } } },
+      where: { type: "PORTAIL", statut: { in: ["ACTIF", "STOCK"] }, pose: null, foyer: { is: { ...(zone && { quartier: { is: zone } }) } } },
+      include: {
+        foyer: {
+          include: {
+            quartier: { include: { ville: true, commune: true } },
+            membres: { where: { role: "TITULAIRE" }, take: 1 },
+            recensePar: { select: { nom: true } },
+            abonnements: { select: { id: true }, take: 1 },
+            paiements: { where: { statut: "REUSSI" }, select: { montantFcfa: true } },
+          },
+        },
+      },
       orderBy: { creeLe: "asc" },
-      take: 100,
+      take: 300,
     });
-    return supports.map((s) => ({
-      code: s.code,
-      libelle: SUPPORTS[s.type].libelle,
-      foyer: s.foyer && { libelle: s.foyer.libelle, adresse: s.foyer.adresse, quartier: s.foyer.quartier.nom, ville: s.foyer.quartier.ville.nom },
-    }));
+    const zonesVues = u.role === "AGENT" ? await this.zonesDe(u.id) : [];
+    return {
+      zones: zonesVues,
+      clients: supports.flatMap((s) => {
+        const f = s.foyer;
+        if (!f) return [];
+        const t = f.membres[0];
+        const encaisse = f.paiements.reduce((total, p) => total + p.montantFcfa, 0);
+        return [
+          {
+            code: s.code,
+            libelle: SUPPORTS[s.type].libelle,
+            client: t ? `${t.prenom} ${t.nom}` : f.libelle,
+            telephone: t?.telephone ?? null,
+            foyer: { libelle: f.libelle, adresse: f.adresse, quartier: f.quartier.nom, commune: f.quartier.commune?.nom ?? null, ville: f.quartier.ville.nom },
+            recenseur: f.recensePar?.nom ?? null,
+            paye: f.abonnements.length > 0,
+            encaisseFcfa: encaisse,
+            recenseLe: f.creeLe,
+          },
+        ];
+      }),
+    };
+  }
+
+  async zonesDe(utilisateurId: string) {
+    const zones = await this.db.zonePoseur.findMany({ where: { utilisateurId }, include: { ville: true, commune: true } });
+    return zones.map((z) => ({ ville: z.ville.nom, commune: z.commune?.nom ?? null }));
   }
 }
 
@@ -154,8 +195,8 @@ export class PoseController {
   constructor(private readonly service: PoseService) {}
 
   @Get("a-poser")
-  aPoser() {
-    return this.service.aPoser();
+  aPoser(@Utilisateur() u: UtilisateurConnecte) {
+    return this.service.aPoser(u);
   }
 
   @Get("plaques/:code")

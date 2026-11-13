@@ -31,7 +31,7 @@ export function creerAuth(db: PrismaClient) {
     baseURL: config.centraleUrl,
     basePath: "/api/auth",
     // apsig:// : l'application mobile (agents de pose, intervenants), qui garde sa session dans le trousseau du téléphone.
-    trustedOrigins: [config.centraleUrl, "apsig://", ...(process.env.NODE_ENV === "production" ? [] : config.corsOrigins)],
+    trustedOrigins: [...config.backOfficeUrls, "apsig://", ...(process.env.NODE_ENV === "production" ? [] : config.corsOrigins)],
     // Pas d'inscription publique : les comptes sont créés par la commande creer-compte.
     emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 12 },
     // Une session couvre une garde de 12 h, prolongée tant que l'opérateur est actif.

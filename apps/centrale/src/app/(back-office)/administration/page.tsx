@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { LIBELLES_ROLE, LIBELLES_STATUT_UNITE, LIBELLES_TYPE_UNITE, peutGererRole, ROLES, TYPES_UNITE, type Role, type StatutUnite } from "@apsig/domain";
+import { LIBELLES_ROLE, LIBELLES_STATUT_UNITE, LIBELLES_TYPE_UNITE, peutGererRole, ROLES, ROLES_TELEPHONE, TYPES_UNITE, type Role, type StatutUnite } from "@apsig/domain";
 import { Bloc, BOUTON, BOUTON_DISCRET, CHAMP, Champ, Erreur, valeur } from "@/components/Formulaire";
 import { useSession } from "@/components/Session";
 import { appelApi } from "@/lib/api";
@@ -50,6 +50,8 @@ export default function PageAdministration() {
   const [envoi, setEnvoi] = useState(false);
   const rolesPermis = ROLES.filter((r) => peutGererRole(compte.role, r));
   const [roleNouveau, setRoleNouveau] = useState<Role>("OPERATEUR");
+  // Terrain (recenseur, poseur) : compte au téléphone, sans e-mail.
+  const auTelephone = ROLES_TELEPHONE.includes(roleNouveau);
 
   const [unites, setUnites] = useState<UniteAdmin[] | null>(null);
   const charger = useCallback(() => appelApi<CompteAdmin[]>("/administration/comptes").then(setComptes, (e: Error) => setErreur(e.message)), []);
@@ -81,7 +83,7 @@ export default function PageAdministration() {
     const r = await executer(() =>
       appelApi<{ compte: { identifiant: string }; motDePasse: string }>(
         "/administration/comptes",
-        roleNouveau === "RECENSEUR"
+        auTelephone
           ? { nom: valeur(d, "nom"), telephone: valeur(d, "telephone"), role: roleNouveau, chefId: valeur(d, "chefId") }
           : { nom: valeur(d, "nom"), email: valeur(d, "email"), role: roleNouveau },
       ),
@@ -149,7 +151,7 @@ export default function PageAdministration() {
           <Champ libelle="Nom">
             <input name="nom" required minLength={2} maxLength={80} className={CHAMP} />
           </Champ>
-          {roleNouveau === "RECENSEUR" ? (
+          {auTelephone ? (
             <Champ libelle="Téléphone (identifiant de connexion)">
               <input name="telephone" type="tel" inputMode="tel" required pattern="\+?[0-9 .\-]{10,20}" placeholder="07 00 00 00 00" className={CHAMP} />
             </Champ>
@@ -167,7 +169,7 @@ export default function PageAdministration() {
               ))}
             </select>
           </Champ>
-          {roleNouveau === "RECENSEUR" && (
+          {auTelephone && (
             <Champ libelle="Chef d'équipe">
               <select name="chefId" defaultValue="" className={CHAMP}>
                 <option value="">Aucun</option>
@@ -183,8 +185,8 @@ export default function PageAdministration() {
             Créer
           </button>
         </form>
-        {roleNouveau === "RECENSEUR" && (
-          <p className="mt-2 text-xs text-attenue">Le recenseur se connecte avec son téléphone et son mot de passe, sans application d'authentification. Il ne voit que les clients qu'il a recensés.</p>
+        {auTelephone && (
+          <p className="mt-2 text-xs text-attenue">Recenseurs et poseurs se connectent sur code-secours.apsig.online avec leur téléphone et leur mot de passe, sans application d'authentification. Le recenseur ne voit que ses clients, le poseur que les clients de ses zones (attribuées dans Équipe terrain).</p>
         )}
       </Bloc>
 
@@ -226,7 +228,7 @@ export default function PageAdministration() {
                     ) : (
                       LIBELLES_ROLE[c.role]
                     )}
-                    {c.role === "RECENSEUR" &&
+                    {ROLES_TELEPHONE.includes(c.role) &&
                       (c.gerable && c.actif ? (
                         <select
                           value={c.chef?.id ?? ""}

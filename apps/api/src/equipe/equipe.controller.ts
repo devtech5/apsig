@@ -1,17 +1,26 @@
-import { Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, Injectable, Module, NotFoundException, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, Injectable, Module, NotFoundException, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { aAcces, emailTerrain, ROLES_EQUIPE, type Role } from "@apsig/domain";
 import { affichage } from "../administration/administration.service.ts";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
 import { definirMotDePasse } from "../auth/comptes.ts";
+import { villeEtCommune } from "../lieux/lieux.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
 
-const nouveauRecenseur = z.object({
+const nouveauMembre = z.object({
   nom: z.string().trim().min(2).max(80),
   telephone: z.string().trim().max(20),
-  // Administrateur seulement : rattacher le recenseur à un chef d'équipe.
+  // Recenseur (étape 1) ou poseur de plaques (étape 2).
+  role: z.enum(["RECENSEUR", "AGENT"]).default("RECENSEUR"),
+  // Administrateur seulement : rattacher le membre à un chef d'équipe.
   chefId: z.string().min(1).nullable().optional(),
+});
+// Zones d'un poseur : communes (ou villes entières sans commune), par leur nom.
+const zones = z.object({
+  zones: z
+    .array(z.object({ ville: z.string().trim().min(1).max(80), commune: z.string().trim().max(80).nullable().optional().transform((v) => (v ? v : null)) }))
+    .max(30),
 });
 const etat = z.object({ actif: z.boolean() });
 
@@ -26,7 +35,7 @@ export class EquipeService {
   async tableau(u: UtilisateurConnecte) {
     const membres = await this.db.utilisateur.findMany({
       where: this.estAdmin(u) ? { role: { in: ["RECENSEUR", "AGENT", "CHEF_EQUIPE"] } } : { chefId: u.id },
-      include: { chef: { select: { nom: true } } },
+      include: { chef: { select: { nom: true } }, zones: { include: { ville: true, commune: true } } },
       orderBy: [{ actif: "desc" }, { nom: "asc" }],
     });
     const ids = membres.map((m) => m.id);
@@ -62,6 +71,7 @@ export class EquipeService {
         role: m.role,
         actif: m.actif,
         chef: m.chef?.nom ?? null,
+        zones: m.zones.map((z) => ({ ville: z.ville.nom, commune: z.commune?.nom ?? null })),
         gerable: this.peutGerer(u, m),
         recenses: nbRecenses.get(m.id) ?? 0,
         payes: nbPayes.get(m.id) ?? 0,
@@ -81,8 +91,8 @@ export class EquipeService {
     };
   }
 
-  // Le mot de passe n'est montré qu'une fois : le chef le remet en main propre au recenseur.
-  async creerRecenseur(d: z.infer<typeof nouveauRecenseur>, u: UtilisateurConnecte) {
+  // Le mot de passe n'est montré qu'une fois : le chef le remet en main propre au recenseur ou au poseur.
+  async creerMembre(d: z.infer<typeof nouveauMembre>, u: UtilisateurConnecte) {
     const email = emailTerrain(d.telephone);
     if (!email) throw new ConflictException("Numéro de téléphone invalide (10 chiffres)");
     if (await this.db.utilisateur.findUnique({ where: { email } })) throw new ConflictException("Un compte existe déjà avec ce téléphone");
@@ -91,10 +101,28 @@ export class EquipeService {
       const chef = await this.db.utilisateur.findUnique({ where: { id: chefId } });
       if (!chef || chef.role !== "CHEF_EQUIPE" || !chef.actif) throw new NotFoundException("Chef d'équipe inconnu ou désactivé");
     }
-    const { utilisateur, motDePasse } = await definirMotDePasse(this.db, { email, nom: d.nom, role: "RECENSEUR" });
+    const { utilisateur, motDePasse } = await definirMotDePasse(this.db, { email, nom: d.nom, role: d.role });
     await this.db.utilisateur.update({ where: { id: utilisateur.id }, data: { chefId } });
-    await this.auditer(u, "compte.creer", email, { role: "RECENSEUR", chefId });
+    await this.auditer(u, "compte.creer", email, { role: d.role, chefId });
     return { compte: { id: utilisateur.id, identifiant: affichage(email) }, motDePasse };
+  }
+
+  // Zones du poseur, remplacées en bloc ; une ville ou une commune absente du référentiel y est ajoutée.
+  async definirZones(id: string, d: z.infer<typeof zones>, u: UtilisateurConnecte) {
+    const m = await this.membre(id, u);
+    if (m.role !== "AGENT") throw new ConflictException("Seuls les poseurs de plaques ont une zone");
+    await this.db.$transaction(async (tx) => {
+      const ajoutes: string[] = [];
+      const lignes = new Map<string, { villeId: string; communeId: string | null }>();
+      for (const z of d.zones) {
+        const { ville, communeId } = await villeEtCommune(tx, z, ajoutes);
+        lignes.set(`${ville.id}/${communeId ?? ""}`, { villeId: ville.id, communeId });
+      }
+      await tx.zonePoseur.deleteMany({ where: { utilisateurId: id } });
+      if (lignes.size) await tx.zonePoseur.createMany({ data: [...lignes.values()].map((l) => ({ utilisateurId: id, ...l })) });
+      await tx.audit.create({ data: { action: "zone.definir", cible: m.email, auteurId: u.id, details: { zones: d.zones, ...(ajoutes.length && { ajoutes }) } } });
+    });
+    return this.tableau(u);
   }
 
   async reinitialiser(id: string, u: UtilisateurConnecte) {
@@ -142,9 +170,20 @@ export class EquipeController {
     return this.service.tableau(u);
   }
 
+  @Post("membres")
+  creer(@Body(new ZodPipe(nouveauMembre)) body: z.infer<typeof nouveauMembre>, @Utilisateur() u: UtilisateurConnecte) {
+    return this.service.creerMembre(body, u);
+  }
+
+  // Ancienne adresse (recenseurs seulement), gardée pour les pages déjà ouvertes.
   @Post("recenseurs")
-  creer(@Body(new ZodPipe(nouveauRecenseur)) body: z.infer<typeof nouveauRecenseur>, @Utilisateur() u: UtilisateurConnecte) {
-    return this.service.creerRecenseur(body, u);
+  creerRecenseur(@Body(new ZodPipe(nouveauMembre)) body: z.infer<typeof nouveauMembre>, @Utilisateur() u: UtilisateurConnecte) {
+    return this.service.creerMembre({ ...body, role: "RECENSEUR" }, u);
+  }
+
+  @Put("membres/:id/zones")
+  definirZones(@Param("id") id: string, @Body(new ZodPipe(zones)) body: z.infer<typeof zones>, @Utilisateur() u: UtilisateurConnecte) {
+    return this.service.definirZones(id, body, u);
   }
 
   @Post("membres/:id/reinitialiser")

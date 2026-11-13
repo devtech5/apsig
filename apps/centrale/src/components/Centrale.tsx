@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { appelApi, ErreurApi, type FileCentrale, type Presence } from "@/lib/api";
+import { espaceSurSite, siteCourant } from "@/lib/site";
 import { useSession } from "./Session";
 
 // Le flux temps réel (SSE) déclenche la relecture de la file ; ce rappel régulier la resynchronise
@@ -57,7 +58,8 @@ export function doitSonner(file: FileCentrale, supervision: boolean) {
 export function CentraleProvider({ children }: { children: React.ReactNode }) {
   const { compte } = useSession();
   // Avant l'activation de la double authentification, seule la page Sécurité est ouverte.
-  const actif = compte.espaces.includes("centrale") && !compte.deuxFacteursRequis;
+  // File, sirène et présence : seulement sur le site de la centrale (pas sur le terrain ni au QG).
+  const actif = compte.espaces.includes("centrale") && !compte.deuxFacteursRequis && espaceSurSite("centrale", siteCourant());
   return actif ? <FileEnDirect supervision={compte.espaces.includes("supervision")}>{children}</FileEnDirect> : children;
 }
 

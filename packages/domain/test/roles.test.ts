@@ -21,20 +21,20 @@ describe("Espaces du back-office", () => {
 });
 
 describe("Accès terrain", () => {
-  it("recenseur : recensement seulement ; poseur : recensement et pose ; chef d'équipe : équipe en plus", () => {
+  it("travail dissocié : recenseur au recensement, poseur à la pose ; chef d'équipe : les deux et l'équipe", () => {
     expect(aAcces("RECENSEUR", "recensement")).toBe(true);
     expect(aAcces("RECENSEUR", "pose")).toBe(false);
     expect(aAcces("RECENSEUR", "abonnements")).toBe(false);
     expect(aAcces("AGENT", "pose")).toBe(true);
-    expect(aAcces("AGENT", "recensement")).toBe(true);
+    expect(aAcces("AGENT", "recensement")).toBe(false);
     expect(aAcces("AGENT", "equipe")).toBe(false);
     expect(aAcces("CHEF_EQUIPE", "equipe")).toBe(true);
     expect(aAcces("CHEF_EQUIPE", "administration")).toBe(false);
   });
 
-  it("seul le recenseur se passe de la double authentification", () => {
+  it("seul le terrain (recenseur, poseur) se passe de la double authentification", () => {
     expect(deuxFacteursExige("RECENSEUR")).toBe(false);
-    expect(deuxFacteursExige("AGENT")).toBe(true);
+    expect(deuxFacteursExige("AGENT")).toBe(false);
     expect(deuxFacteursExige("CHEF_EQUIPE")).toBe(true);
   });
 

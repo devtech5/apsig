@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "@/components/Session";
 import { BOUTON, CHAMP, Champ, Erreur } from "@/components/Formulaire";
 import { appelApi } from "@/lib/api";
 import { dateHeure, lienCarte } from "@/lib/format";
@@ -16,6 +17,20 @@ type Plaque = {
   precisionRequiseM: number;
 };
 type Releve = { lat: number; lng: number; precisionM: number };
+// Clients à équiper dans les zones du poseur (GET /pose/a-poser).
+type APoser = {
+  zones: { ville: string; commune: string | null }[];
+  clients: {
+    code: string;
+    client: string;
+    telephone: string | null;
+    foyer: { adresse: string | null; quartier: string; commune: string | null; ville: string };
+    recenseur: string | null;
+    paye: boolean;
+    encaisseFcfa: number;
+    recenseLe: string;
+  }[];
+};
 
 // Durée maximale d'un relevé : au-delà, l'agent se déplace (dehors, loin des murs) et relance.
 const DUREE_RELEVE_MS = 60_000;
@@ -64,21 +79,41 @@ export default function PagePose() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [recherche, setRecherche] = useState(false);
   const [terminee, setTerminee] = useState<Plaque | null>(null);
+  const [liste, setListe] = useState<APoser | null>(null);
+  const { compte } = useSession();
+  // Seul le poseur a une zone ; chef d'équipe et QG voient tout.
+  const compteSansZone = compte.role === "AGENT";
+  const [filtre, setFiltre] = useState("");
 
-  async function chercher(e: React.FormEvent) {
-    e.preventDefault();
-    if (!code.trim()) return;
+  const chargerListe = useCallback(() => {
+    appelApi<APoser>("/pose/a-poser").then(setListe, (e: Error) => setErreur(e.message));
+  }, []);
+  useEffect(chargerListe, [chargerListe]);
+
+  async function ouvrir(saisi: string) {
+    if (!saisi.trim()) return;
+    setCode(saisi.trim());
     setRecherche(true);
     setErreur(null);
     setPlaque(null);
     try {
-      setPlaque(await appelApi<Plaque>(`/pose/plaques/${encodeURIComponent(code.trim())}`));
+      setPlaque(await appelApi<Plaque>(`/pose/plaques/${encodeURIComponent(saisi.trim())}`));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setErreur((err as Error).message);
     } finally {
       setRecherche(false);
     }
   }
+
+  const chercher = (e: React.FormEvent) => {
+    e.preventDefault();
+    void ouvrir(code);
+  };
+  const clients = (liste?.clients ?? []).filter((c) => {
+    const f = filtre.trim().toLowerCase();
+    return !f || [c.code, c.client, c.telephone ?? "", c.foyer.quartier, c.foyer.commune ?? "", c.foyer.ville].some((v) => v.toLowerCase().includes(f));
+  });
 
   if (terminee) {
     return (
@@ -127,7 +162,47 @@ export default function PagePose() {
         </Champ>
       </form>
       <Erreur message={erreur} />
-      {plaque && <Conclusion plaque={plaque} onFaite={setTerminee} />}
+      {plaque && <Conclusion plaque={plaque} onFaite={(p) => { setTerminee(p); chargerListe(); }} />}
+
+      {!plaque && liste && (
+        <section className="grid gap-2 rounded-2xl bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="mr-auto text-xs font-bold tracking-wide text-attenue uppercase">Clients à équiper ({liste.clients.length})</h2>
+            <input value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder="Nom, quartier, code…" aria-label="Filtrer les clients" className={`${CHAMP} max-w-52`} />
+          </div>
+          {liste.zones.length > 0 && (
+            <p className="text-xs text-attenue">Vos zones : {liste.zones.map((z) => (z.commune ? `${z.commune} (${z.ville})` : z.ville)).join(", ")}</p>
+          )}
+          {liste.clients.length === 0 && (
+            <p className="text-sm text-attenue">
+              {liste.zones.length === 0 && compteSansZone ? "Aucune zone ne vous est attribuée : demandez à votre chef d'équipe." : "Aucune plaque à poser pour l'instant."}
+            </p>
+          )}
+          <ul className="grid gap-2">
+            {clients.map((c) => (
+              <li key={c.code}>
+                <button type="button" onClick={() => void ouvrir(c.code)} className="grid w-full gap-0.5 rounded-xl bg-fond px-3 py-2 text-left hover:ring-2 hover:ring-ligne">
+                  <span className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-mono font-bold text-brand">{c.code}</span>
+                    <span className={`rounded px-2 py-0.5 text-xs font-bold ${c.paye ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>
+                      {c.paye ? "Payé" : c.encaisseFcfa > 0 ? "Acompte" : "Non payé"}
+                    </span>
+                  </span>
+                  <span className="font-semibold">
+                    {c.client}
+                    {c.telephone && <span className="font-normal text-attenue"> · {c.telephone}</span>}
+                  </span>
+                  <span className="text-sm text-attenue">
+                    {[c.foyer.quartier, c.foyer.commune, c.foyer.ville].filter(Boolean).join(", ")}
+                    {c.foyer.adresse && ` · ${c.foyer.adresse}`}
+                  </span>
+                  {c.recenseur && <span className="text-xs text-attenue">Recensé par {c.recenseur} le {dateHeure(c.recenseLe)}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

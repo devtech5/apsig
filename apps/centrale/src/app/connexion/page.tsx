@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { emailTerrain } from "@apsig/domain";
 import { appelApi, ErreurApi } from "@/lib/api";
+import { NOMS_SITE, siteCourant } from "@/lib/site";
 
 const CHAMP = "rounded-lg border border-ligne px-3 py-2 font-normal";
 
@@ -13,6 +14,12 @@ export default function Connexion() {
   const [envoi, setEnvoi] = useState(false);
   // Mot de passe accepté, code de l'application d'authentification attendu.
   const [code, setCode] = useState<"totp" | "secours" | null>(null);
+  // Titre du site (centrale, terrain, QG), lu après le chargement pour un rendu serveur identique.
+  const [titre, setTitre] = useState({ titre: "Back-office APSIG", sousTitre: "CODE-SECOURS CI · accès réservé aux équipes" });
+  useEffect(() => {
+    const site = siteCourant();
+    if (site !== "tout") setTitre({ titre: NOMS_SITE[site].titre, sousTitre: `CODE-SECOURS CI · ${NOMS_SITE[site].sousTitre}` });
+  }, []);
 
   async function seConnecter(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -74,8 +81,8 @@ export default function Connexion() {
         <div className="flex items-center gap-3">
           <img src="/logo-apsig.svg" alt="" width={32} height={36} className="h-9 w-8" />
           <div>
-            <h1 className="text-lg leading-tight font-black">Back-office APSIG</h1>
-            <p className="text-xs text-attenue">CODE-SECOURS CI · accès réservé aux équipes</p>
+            <h1 className="text-lg leading-tight font-black">{titre.titre}</h1>
+            <p className="text-xs text-attenue">{titre.sousTitre}</p>
           </div>
         </div>
         {!code ? (

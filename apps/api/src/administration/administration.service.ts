@@ -3,6 +3,7 @@ import type { Prisma } from "@apsig/db";
 import {
   aAcces,
   emailTerrain,
+  ROLES_TELEPHONE,
   estEmailTerrain,
   LIBELLES_TYPE_UNITE,
   peutGererRole,
@@ -68,9 +69,9 @@ export class AdministrationService {
     return { compte: { id: utilisateur.id, email: utilisateur.email, identifiant: affichage(utilisateur.email) }, motDePasse };
   }
 
-  // Recenseur : identifiant dérivé du téléphone ; autres comptes : e-mail.
+  // Terrain (recenseur, poseur) : identifiant dérivé du téléphone ; autres comptes : e-mail.
   private identifiant(d: { email?: string | undefined; telephone?: string | undefined; role: Role }) {
-    if (d.role === "RECENSEUR") {
+    if (ROLES_TELEPHONE.includes(d.role)) {
       const email = emailTerrain(d.telephone ?? "");
       if (!email) throw new BadRequestException("Numéro de téléphone invalide (10 chiffres)");
       return email;

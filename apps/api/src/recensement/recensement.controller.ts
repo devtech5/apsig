@@ -1,11 +1,12 @@
 import { BadRequestException, Body, ConflictException, Controller, Get, Injectable, Module, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { CIBLES, cleLieu, codeLieu, COMMUNES_CI, FORFAIT_UNIQUE, MOYENS_PAIEMENT, nomLieu, urlAlerte, VILLES_CI, type Cible } from "@apsig/domain";
+import { CIBLES, cleLieu, COMMUNES_CI, FORFAIT_UNIQUE, MOYENS_PAIEMENT, urlAlerte, VILLES_CI, type Cible } from "@apsig/domain";
 import { AbonnementsModule } from "../abonnements/abonnements.module.ts";
 import { AbonnementsService } from "../abonnements/abonnements.service.ts";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { config } from "../config.ts";
+import { quartierDe } from "../lieux/lieux.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
 
 const texte = (max: number) => z.string().trim().min(1).max(max);
@@ -79,33 +80,9 @@ export class RecensementService {
   private async quartierDe(lieu: { ville: string; commune: string | null; quartier: string }, u: UtilisateurConnecte) {
     return this.db.$transaction(async (tx) => {
       const ajoutes: string[] = [];
-      const villes = await tx.ville.findMany({ select: { id: true, nom: true, code: true } });
-      let ville = villes.find((v) => cleLieu(v.nom) === cleLieu(lieu.ville));
-      if (!ville) {
-        const nom = VILLES_CI.find((n) => cleLieu(n) === cleLieu(lieu.ville)) ?? nomLieu(lieu.ville);
-        ville = await tx.ville.create({ data: { nom, code: codeLieu(nom, "ville", new Set(villes.map((v) => v.code))) }, select: { id: true, nom: true, code: true } });
-        ajoutes.push(`ville ${nom}`);
-      }
-      let communeId: string | null = null;
-      if (lieu.commune) {
-        const communes = await tx.commune.findMany({ where: { villeId: ville.id } });
-        let commune = communes.find((c) => cleLieu(c.nom) === cleLieu(lieu.commune!));
-        if (!commune) {
-          const nom = (COMMUNES_CI[ville.nom] ?? []).find((n) => cleLieu(n) === cleLieu(lieu.commune!)) ?? nomLieu(lieu.commune);
-          commune = await tx.commune.create({ data: { nom, villeId: ville.id, code: codeLieu(nom, "commune", new Set(communes.map((c) => c.code))) } });
-          ajoutes.push(`commune ${nom}`);
-        }
-        communeId = commune.id;
-      }
-      const quartiers = await tx.quartier.findMany({ where: { villeId: ville.id } });
-      let quartier = quartiers.find((q) => cleLieu(q.nom) === cleLieu(lieu.quartier) && (q.communeId === communeId || !communeId));
-      if (!quartier) {
-        const nom = nomLieu(lieu.quartier);
-        quartier = await tx.quartier.create({ data: { nom, villeId: ville.id, communeId, code: codeLieu(nom, "quartier", new Set(quartiers.map((q) => q.code))) } });
-        ajoutes.push(`quartier ${nom}`);
-      }
-      if (ajoutes.length) await tx.audit.create({ data: { action: "lieu.ajouter", cible: ville.nom, auteurId: u.id, details: { ajoutes } } });
-      return quartier.id;
+      const { villeNom, quartierId } = await quartierDe(tx, lieu, ajoutes);
+      if (ajoutes.length) await tx.audit.create({ data: { action: "lieu.ajouter", cible: villeNom, auteurId: u.id, details: { ajoutes } } });
+      return quartierId;
     });
   }
 

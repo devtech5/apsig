@@ -1,28 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { type Espace, LIBELLES_ESPACE, LIBELLES_ROLE } from "@apsig/domain";
 import type { Presence } from "@/lib/api";
+import { espaceSurSite, NOMS_SITE, SITE_ESPACE, siteCourant } from "@/lib/site";
 import { useCentrale } from "./Centrale";
 import { Icone, type NomIcone } from "./Icone";
 import { useSession } from "./Session";
 
+// Pages de chaque site (lib/site.ts) : la centrale (alertes), le terrain (recensement, pose), le QG (pilotage).
 const NAVIGATION: { href: string; libelle: string; icone: NomIcone; espace: Espace }[] = [
   { href: "/", libelle: "Alertes", icone: "file", espace: "centrale" },
   { href: "/carte", libelle: "Carte", icone: "carte", espace: "centrale" },
   { href: "/supervision", libelle: "Supervision", icone: "equipe", espace: "supervision" },
-  { href: "/abonnements", libelle: "Abonnements", icone: "maison", espace: "abonnements" },
-  // Agents de terrain : recensement des clients (étape 1 de l'inscription), depuis le navigateur du téléphone.
   { href: "/recensement", libelle: "Recensement", icone: "plus", espace: "recensement" },
   { href: "/pose", libelle: "Pose de plaque", icone: "repere", espace: "pose" },
   { href: "/equipe", libelle: "Équipe terrain", icone: "equipe", espace: "equipe" },
-  { href: "/administration", libelle: "Administration", icone: "reglages", espace: "administration" },
+  { href: "/administration", libelle: "Personnel", icone: "reglages", espace: "administration" },
+  { href: "/abonnements", libelle: "Abonnements", icone: "maison", espace: "abonnements" },
+  { href: "/finance", libelle: "Finance", icone: "file", espace: "finance" },
+  { href: "/forfaits", libelle: "Forfaits", icone: "lien", espace: "forfaits" },
+  { href: "/prestataires", libelle: "Prestataires", icone: "bouclier", espace: "prestataires" },
 ];
 
-// Page d'accueil de chaque compte : la première de ses espaces.
-export const accueilDe = (espaces: Espace[]) => NAVIGATION.find((n) => espaces.includes(n.espace))?.href ?? "/securite";
+const liensDe = (espaces: Espace[]) => NAVIGATION.filter((n) => espaces.includes(n.espace) && espaceSurSite(n.espace, siteCourant()));
+
+// Page d'accueil de chaque compte sur ce site : la première de ses espaces.
+export const accueilDe = (espaces: Espace[]) => liensDe(espaces)[0]?.href ?? "/securite";
+
+// Page du site courant correspondant au chemin (la plus longue correspondance), pour refuser celles d'un autre site.
+const pageDe = (chemin: string) =>
+  NAVIGATION.filter((n) => (n.href === "/" ? chemin === "/" : chemin === n.href || chemin.startsWith(`${n.href}/`))).sort((a, b) => b.href.length - a.href.length)[0];
 
 const PRESENCES: [Presence, string][] = [
   ["EN_SERVICE", "En service"],
@@ -34,8 +44,18 @@ export function Coque({ children }: { children: React.ReactNode }) {
   const { compte } = useSession();
   const centrale = useCentrale();
   const chemin = usePathname();
+  const router = useRouter();
   const actif = (href: string) => (href === "/" ? chemin === "/" : chemin.startsWith(href));
-  const liens = NAVIGATION.filter((n) => compte.espaces.includes(n.espace));
+  const liens = liensDe(compte.espaces);
+  const site = siteCourant();
+  // Page d'un autre site, ou d'un espace que le compte n'a pas : retour à l'accueil du site.
+  const page = pageDe(chemin);
+  const horsSite = page != null && (!espaceSurSite(page.espace, site) || !compte.espaces.includes(page.espace));
+  useEffect(() => {
+    if (horsSite && liens.length > 0) router.replace(liens[0]!.href);
+  }, [horsSite, liens, router]);
+  // Sites où ce compte travaille, quand ce n'est pas celui-ci.
+  const ailleurs = [...new Set(compte.espaces.map((e) => SITE_ESPACE[e]).filter((s) => s != null))].filter((s) => s !== site);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -44,7 +64,7 @@ export function Coque({ children }: { children: React.ReactNode }) {
           <img src="/logo-apsig.svg" alt="" width={24} height={28} className="h-7 w-6" />
           <span className="leading-tight">
             <span className="block font-black">APSIG</span>
-            <span className="block text-[11px] text-white/70">CODE-SECOURS CI</span>
+            <span className="block text-[11px] text-white/70">{site === "tout" ? "CODE-SECOURS CI" : NOMS_SITE[site].titre.toUpperCase()}</span>
           </span>
         </Link>
         {!compte.deuxFacteursRequis && (
@@ -67,11 +87,20 @@ export function Coque({ children }: { children: React.ReactNode }) {
       </header>
       {centrale?.file?.crise.actif && <BandeauCrise />}
       {!compte.deuxFacteursRequis && liens.length === 0 && (
-        <p role="status" className="bg-brand-clair px-4 py-2 text-sm text-brand print:hidden">
-          Votre compte s'utilise dans l'application mobile APSIG ({compte.espaces.map((e) => LIBELLES_ESPACE[e]).join(", ")}). Ici, vous pouvez gérer la sécurité du compte.
-        </p>
+        <div role="status" className="grid gap-1 bg-brand-clair px-4 py-3 text-sm text-brand print:hidden">
+          <p>Votre compte ne travaille pas sur ce site ({compte.espaces.map((e) => LIBELLES_ESPACE[e]).join(", ")}).</p>
+          {ailleurs.length > 0 && (
+            <p className="flex flex-wrap gap-3">
+              {ailleurs.map((s) => (
+                <a key={s} href={NOMS_SITE[s].adresse} className="font-bold underline">
+                  Aller sur {NOMS_SITE[s].titre} ({NOMS_SITE[s].adresse.replace("https://", "")})
+                </a>
+              ))}
+            </p>
+          )}
+        </div>
       )}
-      <div className="flex-1">{children}</div>
+      <div className="flex-1">{horsSite ? null : children}</div>
     </div>
   );
 }

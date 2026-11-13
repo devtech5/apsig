@@ -6,6 +6,8 @@ const envFile = path.resolve(import.meta.dirname, "../../../.env");
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const liste = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const sitesDe = (centrale: string) =>
+  /^https?:\/\/centrale\./.test(centrale) ? ["centrale.", "code-secours.", "base."].map((p) => centrale.replace("centrale.", p)) : [centrale];
 
 export const config = {
   port: Number(process.env.API_PORT ?? 4000),
@@ -17,6 +19,11 @@ export const config = {
   limiteAlertesParMinute: Number(process.env.RATE_LIMIT_ALERTES ?? 6),
   // Adresse de la centrale : les cookies de session sont posés sur ce domaine (l'API y est relayée).
   centraleUrl: process.env.CENTRALE_URL ?? "http://localhost:3002",
+  // Les trois sites du back-office (centrale, terrain, QG) relaient l'API : chacun est une origine de connexion.
+  // BACKOFFICE_URLS les liste ; à défaut, ils se déduisent de CENTRALE_URL (centrale.X → code-secours.X, base.X).
+  backOfficeUrls: liste(process.env.BACKOFFICE_URLS).length
+    ? liste(process.env.BACKOFFICE_URLS)
+    : sitesDe(process.env.CENTRALE_URL ?? "http://localhost:3002"),
   // Clé de signature des sessions, obligatoire en production.
   authSecret: process.env.BETTER_AUTH_SECRET,
   // Double authentification (application TOTP) exigée pour tout le back-office, sauf CENTRALE_2FA=facultatif.

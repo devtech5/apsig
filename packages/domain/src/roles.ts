@@ -21,20 +21,27 @@ export const LIBELLES_ROLE: Record<Role, string> = {
 // centrale : traiter les alertes ; supervision : équipe, réattribution, historique, statistiques ;
 // abonnements : foyers, supports et QR codes ; administration : comptes et journal d'audit.
 // recensement : inscrire un client (étape 1) ; pose : poser la plaque et conclure l'inscription (étape 2) ;
-// equipe : suivi des recenseurs et création de leurs comptes ; terrain : missions des unités (application mobile).
+// equipe : suivi des recenseurs et poseurs, leurs comptes et zones ; terrain : missions des unités (application mobile).
+// finance, forfaits, prestataires : pilotage depuis le QG (base.apsig.online).
+// Le travail est dissocié : le recenseur recense, le poseur pose, chacun avec son formulaire.
 export const ESPACES = {
   centrale: ["OPERATEUR", "SUPERVISEUR", "ADMIN", "SUPERADMIN"],
   supervision: ["SUPERVISEUR", "ADMIN", "SUPERADMIN"],
   abonnements: ["CONSEILLER", "ADMIN", "SUPERADMIN"],
   administration: ["ADMIN", "SUPERADMIN"],
-  recensement: ["RECENSEUR", "AGENT", "CHEF_EQUIPE", "CONSEILLER", "ADMIN", "SUPERADMIN"],
-  pose: ["AGENT", "CHEF_EQUIPE", "CONSEILLER", "ADMIN", "SUPERADMIN"],
+  recensement: ["RECENSEUR", "CHEF_EQUIPE", "CONSEILLER", "ADMIN", "SUPERADMIN"],
+  pose: ["AGENT", "CHEF_EQUIPE", "ADMIN", "SUPERADMIN"],
   equipe: ["CHEF_EQUIPE", "ADMIN", "SUPERADMIN"],
+  finance: ["ADMIN", "SUPERADMIN"],
+  forfaits: ["ADMIN", "SUPERADMIN"],
+  prestataires: ["SUPERVISEUR", "ADMIN", "SUPERADMIN"],
   terrain: ["INTERVENANT"],
 } as const satisfies Record<string, readonly Role[]>;
 export type Espace = keyof typeof ESPACES;
 
-export const ESPACES_WEB = ["centrale", "supervision", "abonnements", "administration", "recensement", "pose", "equipe"] as const satisfies readonly Espace[];
+export const ESPACES_WEB = [
+  "centrale", "supervision", "abonnements", "administration", "recensement", "pose", "equipe", "finance", "forfaits", "prestataires",
+] as const satisfies readonly Espace[];
 export const ESPACES_MOBILE = ["recensement", "pose", "terrain"] as const satisfies readonly Espace[];
 
 export const LIBELLES_ESPACE: Record<Espace, string> = {
@@ -45,14 +52,17 @@ export const LIBELLES_ESPACE: Record<Espace, string> = {
   recensement: "Recensement",
   pose: "Pose des plaques",
   equipe: "Équipe terrain",
+  finance: "Finance",
+  forfaits: "Forfaits et abonnements",
+  prestataires: "Prestataires et intervenants",
   terrain: "Missions terrain",
 };
 
 export const aAcces = (role: Role, espace: Espace) => (ESPACES[espace] as readonly Role[]).includes(role);
 
-// Le recenseur, mandataire indépendant sans e-mail, se connecte avec son téléphone et un mot de passe, sans application
-// d'authentification : ses droits se limitent à inscrire des clients et à voir les siens.
-export const ROLES_SANS_DEUX_FACTEURS: readonly Role[] = ["RECENSEUR"];
+// Le terrain (recenseur, poseur de plaques), souvent sans e-mail, se connecte avec son téléphone et un mot de passe, sans
+// application d'authentification : le recenseur ne voit que ses clients, le poseur que les clients à poser dans sa zone.
+export const ROLES_SANS_DEUX_FACTEURS: readonly Role[] = ["RECENSEUR", "AGENT"];
 export const deuxFacteursExige = (role: Role) => !ROLES_SANS_DEUX_FACTEURS.includes(role);
 
 // Un administrateur gère les comptes de rang inférieur ; seul le super-administrateur gère les administrateurs.
@@ -60,8 +70,10 @@ const RANG: Record<Role, number> = { RECENSEUR: 0, AGENT: 0, INTERVENANT: 0, CON
 export const peutGererRole = (acteur: Role, cible: Role) =>
   aAcces(acteur, "administration") && (acteur === "SUPERADMIN" || RANG[cible] < RANG[acteur]);
 
-// Le chef d'équipe crée et gère les comptes de ses recenseurs (et seulement eux).
-export const ROLES_EQUIPE: readonly Role[] = ["RECENSEUR"];
+// Le chef d'équipe crée et gère les comptes de ses recenseurs et de ses poseurs (et seulement eux).
+export const ROLES_EQUIPE: readonly Role[] = ["RECENSEUR", "AGENT"];
+// Comptes au téléphone (pas d'e-mail) : les rôles du terrain que crée le chef d'équipe.
+export const ROLES_TELEPHONE: readonly Role[] = ROLES_EQUIPE;
 
 // Identifiant de connexion d'un compte au téléphone : Better Auth se connecte par e-mail, on en dérive un du numéro.
 // « 07 08 09 10 11 » et « +225 0708091011 » donnent tous deux 2250708091011@terrain.apsig.ci.

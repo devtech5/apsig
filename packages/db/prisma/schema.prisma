@@ -24,6 +24,7 @@ model Ville {
   nom       String
   communes  Commune[] // vide pour une ville sans découpage (Daloa)
   quartiers Quartier[]
+  zones     ZonePoseur[]
 }
 
 // Seulement pour les villes découpées en communes (Abidjan) : entre dans le code plaque.
@@ -33,6 +34,7 @@ model Commune {
   nom       String
   villeId   String
   ville     Ville      @relation(fields: [villeId], references: [id])
+  zones     ZonePoseur[]
   quartiers Quartier[]
 
   @@unique([villeId, code])
@@ -431,6 +433,8 @@ model Utilisateur {
   chefId     String?
   chef       Utilisateur?    @relation("Equipe", fields: [chefId], references: [id])
   equipe     Utilisateur[]   @relation("Equipe")
+  // Poseur de plaques : communes (ou villes entières) où il pose.
+  zones      ZonePoseur[]
   uniteId    String?
   unite      Unite?          @relation(fields: [uniteId], references: [id])
   actif      Boolean         @default(true)
@@ -453,6 +457,20 @@ model Utilisateur {
   audit      Audit[]
 
   @@index([chefId])
+}
+
+// Zone d'un poseur : une commune, ou toute une ville quand communeId est vide (villes sans découpage).
+model ZonePoseur {
+  id            String      @id @default(cuid())
+  utilisateurId String
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+  villeId       String
+  ville         Ville       @relation(fields: [villeId], references: [id])
+  communeId     String?
+  commune       Commune?    @relation(fields: [communeId], references: [id])
+
+  @@unique([utilisateurId, villeId, communeId])
+  @@index([utilisateurId])
 }
 
 // Tables internes de Better Auth : noms de champs imposés par la bibliothèque.

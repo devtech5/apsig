@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { ROLES, STATUTS_UNITE, TYPES_UNITE } from "@apsig/domain";
+import { ROLES, ROLES_TELEPHONE, STATUTS_UNITE, TYPES_UNITE } from "@apsig/domain";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { AdministrationService } from "./administration.service.ts";
@@ -14,7 +14,10 @@ const creation = z
     role: z.enum(ROLES),
     chefId: z.string().min(1).nullable().optional(),
   })
-  .refine((d) => (d.role === "RECENSEUR" ? d.telephone : d.email), { message: "E-mail requis (téléphone pour un recenseur)", path: ["email"] });
+  .refine((d) => ((ROLES_TELEPHONE as readonly string[]).includes(d.role) ? d.telephone : d.email), {
+    message: "E-mail requis (téléphone pour un recenseur ou un poseur)",
+    path: ["email"],
+  });
 const modification = z.object({
   nom: z.string().trim().min(2).max(80).optional(),
   role: z.enum(ROLES).optional(),
