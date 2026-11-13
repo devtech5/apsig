@@ -29,3 +29,12 @@ export async function comptePersonnel(): Promise<ComptePersonnel | null> {
 export async function deconnecterPersonnel() {
   await auth.signOut();
 }
+
+// Recenseurs : connexion par téléphone. Même règle que @apsig/domain (emailTerrain) : « 07 08 09 10 11 » ou
+// « +225 0708091011 » donnent 2250708091011@terrain.apsig.ci, l'identifiant de leur compte.
+export function identifiantConnexion(saisie: string): string | null {
+  const s = saisie.trim();
+  if (s.includes("@")) return s.toLowerCase();
+  const national = s.replace(/\D/g, "").replace(/^(00)?225(?=\d{10}$)/, "");
+  return /^\d{10}$/.test(national) ? `225${national}@terrain.apsig.ci` : null;
+}

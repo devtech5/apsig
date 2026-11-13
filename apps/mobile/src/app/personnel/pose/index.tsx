@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
-import { Bouton, Carte, Ecran, Erreur, Icone, Texte } from "@/components/ui";
+import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Bouton, Carte, Ecran, Erreur, Icone, Texte, styles as ui } from "@/components/ui";
 import { confirmer } from "@/lib/confirmer";
 import { appelPersonnel } from "@/lib/personnel";
 import { useSession } from "@/lib/session";
@@ -14,6 +14,7 @@ export default function Pose() {
   const { fermer } = useSession();
   const [liste, setListe] = useState<APoser[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -24,8 +25,27 @@ export default function Pose() {
   return (
     <Ecran>
       <Bouton grand icone="account-plus" couleur={COULEURS.succes} libelle="Recensement des clients" onPress={() => router.push("/personnel/recensement")} />
-      <Bouton grand icone="qrcode-scan" libelle="Scanner le QR posé" onPress={() => router.push({ pathname: "/scanner", params: { mode: "pose" } })} />
-      <Texte attenue>Fixez le QR, placez-vous devant, puis scannez-le : la position relevée devient l'adresse vérifiée du foyer.</Texte>
+      <Carte>
+        <Text style={styles.titre}>Pose de plaque</Text>
+        <Texte attenue>Saisissez le code gravé sur la plaque (ou scannez son QR) : la pose conclut l'inscription du client.</Texte>
+        <TextInput
+          value={code}
+          onChangeText={(t) => setCode(t.toUpperCase())}
+          placeholder="DAL-LOBIA-053"
+          placeholderTextColor={COULEURS.attenue}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          style={[ui.champ, { fontSize: 20, fontWeight: "800", letterSpacing: 1 }]}
+          accessibilityLabel="Code de la plaque"
+        />
+        <Bouton
+          icone="magnify"
+          libelle="Chercher la plaque"
+          desactive={code.trim().length < 5}
+          onPress={() => router.push({ pathname: "/personnel/pose/plaque/[code]", params: { code: code.trim().replace(/\s+/g, "") } })}
+        />
+        <Bouton secondaire icone="qrcode-scan" libelle="Scanner le QR de la plaque" onPress={() => router.push({ pathname: "/scanner", params: { mode: "pose" } })} />
+      </Carte>
       <Erreur message={erreur} />
       {liste && (
         <Carte>

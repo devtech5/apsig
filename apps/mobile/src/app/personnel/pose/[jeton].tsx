@@ -8,6 +8,7 @@ import { COULEURS } from "@/lib/theme";
 
 type SupportPose = {
   code: string;
+  type: string;
   libelle: string;
   statut: string;
   fixe: boolean;
@@ -26,7 +27,14 @@ export default function PoserQr() {
   const [fait, setFait] = useState(false);
 
   useEffect(() => {
-    void appelPersonnel<SupportPose>(`/pose/supports/${jeton}`).then(setS, (e: Error) => setErreur(e.message));
+    void appelPersonnel<SupportPose>(`/pose/supports/${jeton}`).then(
+      (support) => {
+        // La plaque du portail suit le parcours complet (représentant, GPS à 5 m, photos) : elle conclut l'inscription.
+        if (support.type === "PORTAIL") router.replace({ pathname: "/personnel/pose/plaque/[code]", params: { code: support.code } });
+        else setS(support);
+      },
+      (e: Error) => setErreur(e.message),
+    );
   }, [jeton]);
 
   async function valider() {

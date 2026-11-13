@@ -2,7 +2,7 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { Linking, Text, TextInput, View } from "react-native";
 import { Bouton, Carte, Ecran, Erreur, styles, Texte } from "@/components/ui";
-import { auth, comptePersonnel, type ComptePersonnel } from "@/lib/personnel";
+import { auth, comptePersonnel, identifiantConnexion, type ComptePersonnel } from "@/lib/personnel";
 import { useSession } from "@/lib/session";
 import { COULEURS } from "@/lib/theme";
 
@@ -10,6 +10,7 @@ type Etape = "identifiants" | "code" | "activation";
 const ESPACES_MOBILE = ["recensement", "pose", "terrain"];
 
 // Personnel APSIG : mêmes identifiants et même double authentification que la centrale.
+// Les recenseurs se connectent avec leur téléphone, sans double authentification.
 export default function Connexion() {
   const { ouvrirPersonnel } = useSession();
   const [etape, setEtape] = useState<Etape>("identifiants");
@@ -53,8 +54,10 @@ export default function Connexion() {
 
   const seConnecter = () =>
     executer(async () => {
-      const r = await auth.signIn.email({ email: email.trim().toLowerCase(), password: motDePasse });
-      if (r.error) throw new Error(r.error.status === 401 ? "E-mail ou mot de passe incorrect" : (r.error.message ?? "Connexion impossible"));
+      const identifiant = identifiantConnexion(email);
+      if (!identifiant) throw new Error("Saisissez votre e-mail ou votre numéro de téléphone (10 chiffres)");
+      const r = await auth.signIn.email({ email: identifiant, password: motDePasse });
+      if (r.error) throw new Error(r.error.status === 401 ? "Identifiant ou mot de passe incorrect" : (r.error.message ?? "Connexion impossible"));
       if ((r.data as { twoFactorRedirect?: boolean }).twoFactorRedirect) return setEtape("code");
       await entrer(await comptePersonnel());
     });
@@ -71,7 +74,7 @@ export default function Connexion() {
     <Ecran>
       {etape === "identifiants" && (
         <>
-          <Champ libelle="E-mail" valeur={email} onChange={setEmail} type="email" />
+          <Champ libelle="E-mail ou téléphone" valeur={email} onChange={setEmail} type="email" />
           <Champ libelle="Mot de passe" valeur={motDePasse} onChange={setMotDePasse} type="motDePasse" />
           <Erreur message={erreur} />
           <Bouton grand icone="login" libelle="Se connecter" chargement={envoi} desactive={!email || motDePasse.length < 12} onPress={() => void seConnecter()} />
@@ -118,7 +121,7 @@ function Champ({ libelle, valeur, onChange, type }: { libelle: string; valeur: s
         autoCapitalize="none"
         autoCorrect={false}
         secureTextEntry={type === "motDePasse"}
-        keyboardType={type === "email" ? "email-address" : "default"}
+        keyboardType="default"
         autoComplete={type === "email" ? "email" : "current-password"}
         textContentType={type === "email" ? "username" : "password"}
         style={[styles.champ, { fontSize: 18 }]}

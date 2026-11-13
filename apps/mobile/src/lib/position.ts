@@ -34,7 +34,8 @@ export function vautLaPeine(avant: { position: PositionPrecise; le: number } | n
 
 // Position du téléphone, suivie tant que `actif`. La sécurité prime : on redemande dès que possible
 // (au retour des réglages, toutes les 30 s sans signal), mais jamais en contournant le choix de l'abonné.
-export function usePosition(actif: boolean) {
+// `precis` : pose d'une plaque, le GPS doit descendre sous 5 m (meilleure précision, mesure chaque seconde).
+export function usePosition(actif: boolean, precis = false) {
   const [etat, setEtat] = useState<EtatPosition>("demande");
   const [position, setPosition] = useState<PositionPrecise | null>(null);
   const suivi = useRef<Location.LocationSubscription | null>(null);
@@ -65,7 +66,10 @@ export function usePosition(actif: boolean) {
         }
       }
       if (suivi.current) return;
-      suivi.current = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 5_000, distanceInterval: 5 }, (p) => {
+      const options = precis
+        ? { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1_000, distanceInterval: 0 }
+        : { accuracy: Location.Accuracy.High, timeInterval: 5_000, distanceInterval: 5 };
+      suivi.current = await Location.watchPositionAsync(options, (p) => {
         setPosition({ lat: p.coords.latitude, lng: p.coords.longitude, precisionM: p.coords.accuracy ?? 100 });
         setEtat("ok");
       });
@@ -74,7 +78,7 @@ export function usePosition(actif: boolean) {
     } finally {
       enCours.current = false;
     }
-  }, [arreter]);
+  }, [arreter, precis]);
 
   useEffect(() => {
     if (!actif) return;

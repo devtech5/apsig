@@ -10,16 +10,20 @@ export default function AccueilPersonnel() {
   if (session?.type !== "personnel") return null;
   const { compte } = session;
   const pose = compte.espaces.includes("pose");
+  const recensement = compte.espaces.includes("recensement");
   const terrain = compte.espaces.includes("terrain");
-  if (terrain && !pose) return <Redirect href="/personnel/terrain" />;
+  // Un seul espace : on y va directement. Le poseur arrive sur la pose, qui donne aussi accès au recensement.
+  if (terrain && !pose && !recensement) return <Redirect href="/personnel/terrain" />;
   if (pose && !terrain) return <Redirect href="/personnel/pose" />;
+  if (recensement && !pose && !terrain) return <Redirect href="/personnel/recensement" />;
   return (
     <Ecran>
       <Carte>
         <Texte gras>{compte.nom}</Texte>
         <Texte attenue>{compte.email}</Texte>
       </Carte>
-      {pose && <Bouton grand icone="qrcode-plus" libelle="Pose des QR" onPress={() => router.push("/personnel/pose")} />}
+      {recensement && <Bouton grand icone="account-plus" libelle="Recensement des clients" onPress={() => router.push("/personnel/recensement")} />}
+      {pose && <Bouton grand icone="qrcode-plus" libelle="Pose des plaques" onPress={() => router.push("/personnel/pose")} />}
       {terrain && <Bouton grand icone="ambulance" couleur={COULEURS.danger} libelle="Mes missions" onPress={() => router.push("/personnel/terrain")} />}
       <Bouton
         secondaire

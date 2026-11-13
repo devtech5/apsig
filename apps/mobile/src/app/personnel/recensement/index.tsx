@@ -2,14 +2,19 @@ import { useCallback, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { Bouton, Carte, Ecran, Erreur, Icone, Texte } from "@/components/ui";
+import { confirmer } from "@/lib/confirmer";
 import { appelPersonnel } from "@/lib/personnel";
+import { useSession } from "@/lib/session";
 import { COULEURS } from "@/lib/theme";
 
 export type Recense = {
   id: string;
   code: string | null;
+  qr: { plaque: string | null; interieur: { code: string; url: string } | null };
+  rccm: string | null;
   client: string;
   telephone: string | null;
+  telephone2: string | null;
   lieu: string;
   cible: "PARTICULIER" | "FAMILLE" | "ENTREPRISE" | null;
   paye: boolean;
@@ -19,6 +24,9 @@ export type Recense = {
 
 // Étape 1 de l'inscription : les clients recensés par l'agent, avec leur code Code-Secours.
 export default function Recensements() {
+  const { session, fermer } = useSession();
+  // Le recenseur n'a que cet écran : il s'y déconnecte. Les autres reviennent à leur accueil.
+  const seulEspace = session?.type === "personnel" && !session.compte.espaces.includes("pose");
   const [liste, setListe] = useState<Recense[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -31,7 +39,7 @@ export default function Recensements() {
   return (
     <Ecran>
       <Bouton grand icone="account-plus" libelle="Recenser un client" onPress={() => router.push("/personnel/recensement/nouveau")} />
-      <Texte attenue>Le code Code-Secours est créé à l'enregistrement : notez-le au client. La plaque portant ce code sera posée lors du second passage.</Texte>
+      <Texte attenue>Le code Code-Secours et les QR sont générés à la validation : notez le code au client. La plaque qui le porte sera posée lors du second passage.</Texte>
       <Erreur message={erreur} />
       {liste && (
         <Carte>
@@ -46,6 +54,8 @@ export default function Recensements() {
                 <Texte attenue>
                   {r.lieu}
                   {r.telephone ? ` · ${r.telephone}` : ""}
+                  {r.telephone2 ? ` / ${r.telephone2}` : ""}
+                  {r.rccm ? ` · RCCM ${r.rccm}` : ""}
                 </Texte>
                 <View style={styles.etiquettes}>
                   <Text style={[styles.etiquette, r.paye ? styles.ok : styles.attente]}>{r.paye ? "Payé" : "Non payé"}</Text>
@@ -55,6 +65,15 @@ export default function Recensements() {
             </View>
           ))}
         </Carte>
+      )}
+      {seulEspace && (
+        <Bouton
+          secondaire
+          couleur={COULEURS.attenue}
+          icone="logout"
+          libelle="Se déconnecter"
+          onPress={() => confirmer("Se déconnecter ?", "Il faudra saisir à nouveau votre téléphone et votre mot de passe.", () => void fermer().then(() => router.replace("/")))}
+        />
       )}
     </Ecran>
   );
