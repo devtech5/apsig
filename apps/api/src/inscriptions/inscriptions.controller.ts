@@ -28,7 +28,7 @@ const demande = z.object({
 
 const traitement = z.object({ traitee: z.boolean() });
 
-// Route publique appelée par le formulaire de code-secours.apsig.online (limitée par IP, comme les alertes).
+// Route publique appelée par l'ancien formulaire public (apps/inscription, plus déployé) (limitée par IP, comme les alertes).
 @Controller("public")
 export class InscriptionsController {
   constructor(private readonly db: PrismaService) {}

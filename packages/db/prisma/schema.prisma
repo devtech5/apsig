@@ -240,7 +240,7 @@ model PhotoPose {
 // ─── Inscriptions en ligne ─────────────────────────────────────────────────
 
 enum StatutDemande {
-  NOUVELLE // reçue depuis code-secours.apsig.online, à rappeler
+  NOUVELLE // reçue depuis l'ancien formulaire public (apps/inscription), à rappeler
   TRAITEE // un conseiller a rappelé le demandeur
 }
 

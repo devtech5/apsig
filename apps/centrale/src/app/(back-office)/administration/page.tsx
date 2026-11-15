@@ -186,7 +186,7 @@ export default function PageAdministration() {
           </button>
         </form>
         {auTelephone && (
-          <p className="mt-2 text-xs text-attenue">Recenseurs et poseurs se connectent sur code-secours.apsig.online avec leur téléphone et leur mot de passe, sans application d'authentification. Le recenseur ne voit que ses clients, le poseur que les clients de ses zones (attribuées dans Équipe terrain).</p>
+          <p className="mt-2 text-xs text-attenue">Recenseurs et poseurs se connectent sur op.apsig.online avec leur téléphone et leur mot de passe, sans application d'authentification. Le recenseur ne voit que ses clients, le poseur que les clients de ses zones (attribuées dans Équipe terrain).</p>
         )}
       </Bloc>
 

@@ -1,6 +1,6 @@
 # Page d'alerte CODE-SECOURS — image de production (sortie « standalone » de Next.js).
 # À construire depuis la racine du monorepo :
-#   docker build -f apps/alerte/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.example.ci .
+#   docker build -f apps/alerte/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.apsig.online .
 # NEXT_PUBLIC_API_URL est intégrée au build : la changer impose de reconstruire l'image.
 
 FROM node:22-bookworm-slim AS base

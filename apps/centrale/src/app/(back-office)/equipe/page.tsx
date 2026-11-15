@@ -154,7 +154,7 @@ export default function PageEquipe() {
         </form>
         <p className="mt-2 text-xs text-attenue">
           Le recenseur inscrit les clients (étape 1) et ne voit que les siens. Le poseur pose les plaques (étape 2) chez les clients de ses communes : attribuez-lui
-          ses zones ci-dessous. Tous deux se connectent sur code-secours.apsig.online avec leur téléphone.
+          ses zones ci-dessous. Tous deux se connectent sur op.apsig.online avec leur téléphone.
           {admin && " Pour rattacher un membre à un chef d'équipe, utilisez la page Personnel du QG."}
         </p>
       </Bloc>

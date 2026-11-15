@@ -1,6 +1,6 @@
 // Crée un compte du back-office ou réinitialise son mot de passe (et sa double authentification).
-//   node apps/api/dist/auth/creer-compte.js --email awa@apsig.ci --nom "Awa K." --role OPERATEUR
-//   node apps/api/dist/auth/creer-compte.js --email awa@apsig.ci   (nouveau mot de passe)
+//   node apps/api/dist/auth/creer-compte.js --email awa@apsig.online --nom "Awa K." --role OPERATEUR
+//   node apps/api/dist/auth/creer-compte.js --email awa@apsig.online   (nouveau mot de passe)
 // Le premier compte de production est un SUPERADMIN, qui crée ensuite les autres depuis le back-office.
 // Le mot de passe est généré et affiché une seule fois : il n'est stocké que haché.
 import { parseArgs } from "node:util";

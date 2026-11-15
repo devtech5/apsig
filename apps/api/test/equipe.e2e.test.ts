@@ -44,7 +44,7 @@ describe("Accès terrain", () => {
       await recenseur
         .post("/api/auth/sign-in/email")
         .set("Origin", config.centraleUrl)
-        .send({ email: `225${tel}@terrain.apsig.ci`, password: cree.body.motDePasse })
+        .send({ email: `225${tel}@op.apsig.online`, password: cree.body.motDePasse })
         .expect(200);
       expect((await recenseur.get("/compte").expect(200)).body).toMatchObject({ role: "RECENSEUR", espaces: ["recensement"], deuxFacteursRequis: false });
 
@@ -95,7 +95,7 @@ describe("Accès terrain", () => {
     const tel = telephone();
     await admin.post("/administration/comptes").send({ nom: "Sans téléphone", role: "RECENSEUR" }).expect(400);
     const r = await admin.post("/administration/comptes").send({ nom: "Bamba Issa", telephone: tel, role: "RECENSEUR", chefId: chef.id }).expect(201);
-    expect(await db.utilisateur.findUniqueOrThrow({ where: { id: r.body.compte.id } })).toMatchObject({ role: "RECENSEUR", chefId: chef.id, email: `225${tel}@terrain.apsig.ci` });
+    expect(await db.utilisateur.findUniqueOrThrow({ where: { id: r.body.compte.id } })).toMatchObject({ role: "RECENSEUR", chefId: chef.id, email: `225${tel}@op.apsig.online` });
     const comptes = await admin.get("/administration/comptes").expect(200);
     expect(comptes.body.find((c: { id: string }) => c.id === r.body.compte.id)).toMatchObject({ chef: { id: chef.id }, identifiant: expect.stringMatching(/^07 /) });
   });
@@ -121,7 +121,7 @@ describe("Poseurs et zones", () => {
     await recense(`Commune B ${suffixe}`);
 
     const poseur = request.agent(app.getHttpServer());
-    await poseur.post("/api/auth/sign-in/email").set("Origin", config.centraleUrl).send({ email: `225${tel}@terrain.apsig.ci`, password: cree.body.motDePasse }).expect(200);
+    await poseur.post("/api/auth/sign-in/email").set("Origin", config.centraleUrl).send({ email: `225${tel}@op.apsig.online`, password: cree.body.motDePasse }).expect(200);
     expect((await poseur.get("/compte").expect(200)).body).toMatchObject({ role: "AGENT", espaces: ["pose"] });
     await poseur.post("/pose/recensements").send({}).expect(403);
     const liste = await poseur.get("/pose/a-poser").expect(200);
