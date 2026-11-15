@@ -72,7 +72,7 @@ describe("Supports", () => {
   });
 
   it("construit l'URL encodée dans le QR", () => {
-    expect(urlAlerte("https://alerte.apsig.online/", "abc")).toBe("https://alerte.apsig.online/s/abc");
+    expect(urlAlerte("https://code-secours.apsig.online/", "abc")).toBe("https://code-secours.apsig.online/s/abc");
   });
 });
 

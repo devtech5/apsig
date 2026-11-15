@@ -26,7 +26,7 @@ type Demande = {
 
 const fcfa = (n: number) => `${n.toLocaleString("fr-FR").replace(/ /g, " ")} F`;
 
-// Demandes déposées sur code-secours.apsig.online : le conseiller rappelle, crée le foyer, puis marque la demande traitée.
+// Demandes déposées par l'ancien formulaire public (apps/inscription) : le conseiller rappelle, crée le foyer, puis marque la demande traitée.
 export default function PageDemandes() {
   const [statut, setStatut] = useState<"NOUVELLE" | "TRAITEE">("NOUVELLE");
   const [donnees, setDonnees] = useState<{ demandes: Demande[]; nouvelles: number } | null>(null);

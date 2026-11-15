@@ -19,9 +19,9 @@ L'API est le **seul** composant qui accède à la base et aux fournisseurs : les
 | Dossier | Contenu |
 |---|---|
 | `apps/api` | API NestJS (serveur) |
-| `apps/alerte` | Page d'alerte ouverte par le scan (`/s/<jeton>`) : menu d'urgences, envoi, position suivie en continu avec aide vocale en cas de refus, suivi, annulation |
-| `apps/inscription` | Inscriptions en ligne (`code-secours.apsig.online`) : forfait unique, type de client et coordonnées, sans compte ni paiement ; la demande est enregistrée par l'API (`POST /public/inscriptions`) et un conseiller rappelle |
-| `apps/centrale` | Back-office : centrale d'alertes (file en temps réel, sirène, carte, fiche, répartition), supervision, abonnements (foyers, supports, impression des QR), administration (comptes, journal d'audit) |
+| `apps/alerte` | Page d'alerte ouverte par le scan (`code-secours.apsig.online/s/<jeton>`) : menu d'urgences, envoi, position suivie en continu avec aide vocale en cas de refus, suivi, annulation |
+| `apps/inscription` | Ancien formulaire public d'inscription, **plus déployé** : l'inscription se fait sur `op.apsig.online` (recensement). Forfait unique, type de client et coordonnées, sans compte ni paiement ; la demande est enregistrée par l'API (`POST /public/inscriptions`) et un conseiller rappelle |
+| `apps/centrale` | Back-office, un site par domaine : `centrale.apsig.online` (alertes), `op.apsig.online` (inscription et pose, page selon le rôle du compte), `base.apsig.online` (QG). Contenu : centrale d'alertes (file en temps réel, sirène, carte, fiche, répartition), supervision, abonnements (foyers, supports, impression des QR), administration (comptes, journal d'audit) |
 | `apps/mobile` | Application APSIG pour Android et iPhone (Expo, React Native) : SOS de l'abonné et suivi de son foyer, pose des QR par les agents (GPS = adresse vérifiée), missions des unités terrain, scan sans compte pour un témoin |
 | `packages/domain` | Règles métier pures et testées : urgences, menus par support, codes, fiabilité, cycle de vie |
 | `packages/db` | Schéma Prisma, migrations, données de démonstration |
@@ -106,9 +106,11 @@ Trois applications Dokploy, construites depuis ce dépôt (branche `main`) avec 
 
 | Application | Dockerfile | Port | Domaine |
 |---|---|---|---|
-| API | `Dockerfile` (racine, valeur par défaut ; copie de `apps/api/Dockerfile`) | 4000 | `api.<domaine>` |
-| Page d'alerte | `apps/alerte/Dockerfile` | 3001 | `alerte.<domaine>` (URL encodée dans les QR) |
-| Centrale | `apps/centrale/Dockerfile` | 3002 | `centrale.<domaine>` |
+| API | `Dockerfile` (racine, valeur par défaut ; copie de `apps/api/Dockerfile`) | 4000 | `api.apsig.online` |
+| Page d'alerte | `apps/alerte/Dockerfile` | 3001 | `code-secours.apsig.online` (URL encodée dans les QR) |
+| Back-office | `apps/centrale/Dockerfile` | 3002 | `centrale.apsig.online`, `op.apsig.online`, `base.apsig.online` (trois domaines sur la même application) |
+
+`apsig.online` est réservé au site officiel de l'entreprise, hors de ce dépôt. S'il existe des QR imprimés qui encodent `apsig.online/s/<jeton>`, ce site doit rediriger `/s/*` vers `https://code-secours.apsig.online/s/*`.
 
 Variables de l'**API** (les migrations sont appliquées à chaque démarrage) :
 
@@ -118,17 +120,17 @@ NODE_ENV=production
 API_PORT=4000
 TRUST_PROXY=1
 RATE_LIMIT_ALERTES=6
-PUBLIC_ALERT_URL=https://alerte.<domaine>
-CORS_ORIGINS=https://alerte.<domaine>
-CENTRALE_URL=https://centrale.<domaine>
+PUBLIC_ALERT_URL=https://code-secours.apsig.online
+CORS_ORIGINS=https://code-secours.apsig.online
+CENTRALE_URL=https://centrale.apsig.online   # op. et base. en sont déduits (ou BACKOFFICE_URLS)
 BETTER_AUTH_SECRET=<openssl rand -base64 32>
 EXPO_ACCESS_TOKEN=<facultatif : jeton d'accès Expo si la sécurité des notifications push est activée>
 ```
 
 Sans `BETTER_AUTH_SECRET`, l'API démarre quand même (les alertes passent avant tout), mais les opérateurs sont déconnectés à chaque redémarrage. Sans `CENTRALE_URL` exacte, la connexion à la centrale est refusée. La double authentification est obligatoire : ne jamais définir `CENTRALE_2FA` en production.
 
-**Page d'alerte** : `NEXT_PUBLIC_API_URL=https://api.<domaine>` en **build argument** (elle est intégrée au build : la changer impose un redéploiement). En option, `API_INTERNAL_URL` en variable d'environnement pour que le serveur de la page joigne l'API par le réseau interne.
+**Page d'alerte** : `NEXT_PUBLIC_API_URL=https://api.apsig.online` en **build argument** (elle est intégrée au build : la changer impose un redéploiement). En option, `API_INTERNAL_URL` en variable d'environnement pour que le serveur de la page joigne l'API par le réseau interne.
 
-**Centrale** : `CENTRALE_API_URL=https://api.<domaine>` en **build argument** (adresse de l'API vue par le serveur de la centrale, qui lui relaie `/api/auth`, `/api/compte` et un `/api/<espace>` par espace). Premier compte, depuis le terminal Dokploy du conteneur de l'API : `node apps/api/dist/auth/creer-compte.js --email … --nom "…" --role SUPERADMIN`.
+**Centrale** : `CENTRALE_API_URL=https://api.apsig.online` en **build argument** (adresse de l'API vue par le serveur de la centrale, qui lui relaie `/api/auth`, `/api/compte` et un `/api/<espace>` par espace). Premier compte, depuis le terminal Dokploy du conteneur de l'API : `node apps/api/dist/auth/creer-compte.js --email … --nom "…" --role SUPERADMIN`.
 
-Vérification : `https://api.<domaine>/sante` doit répondre `{ "statut": "ok", "base": "ok", … }`.
+Vérification : `https://api.apsig.online/sante` doit répondre `{ "statut": "ok", "base": "ok", … }`.

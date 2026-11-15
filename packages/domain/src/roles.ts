@@ -76,14 +76,14 @@ export const ROLES_EQUIPE: readonly Role[] = ["RECENSEUR", "AGENT"];
 export const ROLES_TELEPHONE: readonly Role[] = ROLES_EQUIPE;
 
 // Identifiant de connexion d'un compte au téléphone : Better Auth se connecte par e-mail, on en dérive un du numéro.
-// « 07 08 09 10 11 » et « +225 0708091011 » donnent tous deux 2250708091011@terrain.apsig.online.
-export const DOMAINE_TERRAIN = "terrain.apsig.online";
+// « 07 08 09 10 11 » et « +225 0708091011 » donnent tous deux 2250708091011@op.apsig.online.
+export const DOMAINE_TERRAIN = "op.apsig.online";
 export const emailTerrain = (telephone: string) => {
   const n = normaliserTelephone(telephone);
   return /^\d{10}$/.test(n) ? `225${n}@${DOMAINE_TERRAIN}` : null;
 };
 export const estEmailTerrain = (email: string) => email.endsWith(`@${DOMAINE_TERRAIN}`);
-// « 2250708091011@terrain.apsig.online » → « 07 08 09 10 11 », pour l'affichage.
+// « 2250708091011@op.apsig.online » → « 07 08 09 10 11 », pour l'affichage.
 export const telephoneDeEmail = (email: string) => {
   const n = email.split("@")[0]!.slice(3);
   return n.replace(/(\d{2})(?=\d)/g, "$1 ");

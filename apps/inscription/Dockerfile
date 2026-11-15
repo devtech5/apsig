@@ -1,4 +1,4 @@
-# Inscriptions en ligne CODE-SECOURS (code-secours.apsig.online) — sortie « standalone » de Next.js.
+# Inscriptions en ligne CODE-SECOURS (plus déployé : l'inscription se fait sur op.apsig.online) — sortie « standalone » de Next.js.
 # À construire depuis la racine du monorepo :
 #   docker build -f apps/inscription/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.apsig.online .
 # NEXT_PUBLIC_API_URL est intégrée au build : la changer impose de reconstruire l'image.
