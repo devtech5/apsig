@@ -39,9 +39,9 @@ describe("Accès terrain", () => {
   });
 
   it("le téléphone donne un identifiant de connexion stable", () => {
-    expect(emailTerrain("07 08 09 10 11")).toBe("2250708091011@terrain.apsig.ci");
-    expect(emailTerrain("+225 0708091011")).toBe("2250708091011@terrain.apsig.ci");
+    expect(emailTerrain("07 08 09 10 11")).toBe("2250708091011@terrain.apsig.online");
+    expect(emailTerrain("+225 0708091011")).toBe("2250708091011@terrain.apsig.online");
     expect(emailTerrain("1234")).toBeNull();
-    expect(telephoneDeEmail("2250708091011@terrain.apsig.ci")).toBe("07 08 09 10 11");
+    expect(telephoneDeEmail("2250708091011@terrain.apsig.online")).toBe("07 08 09 10 11");
   });
 });

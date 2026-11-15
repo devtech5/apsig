@@ -3,7 +3,7 @@
 // Même alphabet que genererJeton (@apsig/domain), longueur acceptée par l'API.
 const JETON = /^[A-Za-z0-9]{6,64}$/;
 
-// Le QR encode https://alerte.apsig.ci/s/<jeton>. On n'en garde que le jeton :
+// Le QR encode https://alerte.apsig.online/s/<jeton>. On n'en garde que le jeton :
 // la navigation reste sur ce site, quel que soit le domaine imprimé (démo, préproduction).
 export function extraireJeton(texte: string): string | null {
   let url: URL;

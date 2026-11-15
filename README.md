@@ -45,7 +45,7 @@ pnpm --filter @apsig/centrale start      # http://localhost:3002
 pnpm --filter @apsig/inscription start   # http://localhost:3003 (son adresse doit figurer dans CORS_ORIGINS)
 ```
 
-Premier compte du back-office (il n'y a pas d'inscription) : `pnpm --filter @apsig/api creer-compte --email moi@apsig.ci --nom "Prénom Nom" --role SUPERADMIN`. Le mot de passe est généré et affiché une seule fois ; relancer la commande avec le seul `--email` en génère un nouveau et ferme les sessions ouvertes. Les comptes suivants se créent depuis la page Administration. La double authentification (application TOTP) est demandée à la première connexion ; `CENTRALE_2FA=facultatif` la rend facultative (développement uniquement).
+Premier compte du back-office (il n'y a pas d'inscription) : `pnpm --filter @apsig/api creer-compte --email moi@apsig.online --nom "Prénom Nom" --role SUPERADMIN`. Le mot de passe est généré et affiché une seule fois ; relancer la commande avec le seul `--email` en génère un nouveau et ferme les sessions ouvertes. Les comptes suivants se créent depuis la page Administration. La double authentification (application TOTP) est demandée à la première connexion ; `CENTRALE_2FA=facultatif` la rend facultative (développement uniquement).
 
 La géolocalisation du témoin n'est disponible qu'en HTTPS (ou sur `localhost`) : pour tester depuis un vrai téléphone, passer par un tunnel HTTPS. Le navigateur ne donne jamais la position sans l'accord du témoin : la page la redemande avec une aide en pictogrammes et à voix haute, et un refus est signalé à la centrale pour qu'elle rappelle.
 
