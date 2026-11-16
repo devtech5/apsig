@@ -23,6 +23,44 @@
   --color-succes-fond: #dcfce7;
   --color-alerte-fond: #fef3c7;
   --color-alerte-encre: #854d0e;
+
+  /* Landing page du site officiel (apsig.online, components/site) : rouge du bouclier, orange et vert ivoiriens. */
+  --color-nuit: #0b1a3a;
+  --color-marine: #12285a;
+  --color-signal: #c8102e;
+  --color-signal-clair: #fde4e7;
+  --color-orange: #f77f00;
+  --color-orange-clair: #fff0de;
+  --color-vert: #009e60;
+  --color-vert-clair: #ddf5ea;
+  --color-ivoire: #f7f4ee;
+  --color-sable: #ece6da;
+  --color-erreur: #b91c1c;
+  --color-erreur-fond: #fee2e2;
+}
+
+/* Polices de la landing page, chargées par components/site/Landing.tsx sur son seul conteneur. */
+@theme inline {
+  --font-titre: var(--font-affiche), var(--font-texte), system-ui, sans-serif;
+  --font-corps: var(--font-texte), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/* Trame de points des fonds bleus de la landing page. */
+.trame {
+  background-image: radial-gradient(rgb(255 255 255 / 0.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Onde du signal d'alerte (landing page). */
+@keyframes onde {
+  0% { transform: scale(0.85); opacity: 0.55; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.onde { animation: onde 2.4s ease-out infinite; }
+.onde-2 { animation: onde 2.4s ease-out 1.2s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .onde, .onde-2 { animation: none; opacity: 0; }
 }
 
 html {

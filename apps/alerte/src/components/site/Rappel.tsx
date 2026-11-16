@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CIBLES, LIBELLES_CIBLE, MENSUALITES_FCFA, type Cible } from "@apsig/domain";
-import { deposerDemande, type Demande } from "@/lib/api";
+import { deposerDemande, type Demande } from "./demande";
 import { Icone } from "./Icone";
 import { francs } from "./Offre";
 

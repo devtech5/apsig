@@ -1,4 +1,6 @@
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+import { API_URL } from "@/lib/api";
+
+// Demande de rappel déposée depuis la landing page (apsig.online), traitée par les conseillers comme une inscription en ligne.
 
 export type Demande = {
   cible: string;
