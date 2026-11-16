@@ -107,7 +107,7 @@ Trois applications Dokploy, construites depuis ce dépôt (branche `main`) avec 
 | Application | Dockerfile | Port | Domaine |
 |---|---|---|---|
 | API | `Dockerfile` (racine, valeur par défaut ; copie de `apps/api/Dockerfile`) | 4000 | `api.<domaine>` |
-| Page d'alerte | `apps/alerte/Dockerfile` | 3001 | `alerte.<domaine>` (URL encodée dans les QR) |
+| Page d'alerte | `apps/alerte/Dockerfile` | 3001 | `<domaine>` et `www.<domaine>` (URL encodée dans les QR ; en production `apsig.online`) |
 | Centrale | `apps/centrale/Dockerfile` | 3002 | `centrale.<domaine>` |
 
 Variables de l'**API** (les migrations sont appliquées à chaque démarrage) :
@@ -118,8 +118,8 @@ NODE_ENV=production
 API_PORT=4000
 TRUST_PROXY=1
 RATE_LIMIT_ALERTES=6
-PUBLIC_ALERT_URL=https://alerte.<domaine>
-CORS_ORIGINS=https://alerte.<domaine>
+PUBLIC_ALERT_URL=https://<domaine>
+CORS_ORIGINS=https://<domaine>,https://www.<domaine>,https://code-secours.<domaine>
 CENTRALE_URL=https://centrale.<domaine>
 BETTER_AUTH_SECRET=<openssl rand -base64 32>
 EXPO_ACCESS_TOKEN=<facultatif : jeton d'accès Expo si la sécurité des notifications push est activée>

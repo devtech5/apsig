@@ -64,7 +64,7 @@ Bouton permanent : **« Je me suis trompé — Annuler »**.
 Règles :
 - **Code plaque adaptatif** : `VILLE-QUARTIER-NNN` pour une ville sans communes (Daloa), `VILLE-COMMUNE-QUARTIER-NNN` pour une ville découpée en communes (Abidjan).
 - **Aucun numéro d'urgence imprimé sur les supports.** Les numéros des services (Police, GSPM, SAMU…) sont gérés dans la table des partenaires, côté centrale.
-- Le QR encode **un jeton opaque** (`https://alerte.apsig.ci/s/<jeton>`), jamais le code lisible. Régénérer un QR révoque l'ancien (réponse « révoqué, appelez les secours »).
+- Le QR encode **un jeton opaque** (`https://apsig.online/s/<jeton>`), jamais le code lisible. Régénérer un QR révoque l'ancien (réponse « révoqué, appelez les secours »).
 - La page publique n'affiche **jamais** le nom des personnes : seulement le type de support et, pour un support fixe, le quartier.
 - Un abonnement expiré **n'empêche jamais** le traitement d'une urgence.
 
