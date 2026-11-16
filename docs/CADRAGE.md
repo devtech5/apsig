@@ -64,7 +64,7 @@ Bouton permanent : **« Je me suis trompé — Annuler »**.
 Règles :
 - **Code plaque adaptatif** : `VILLE-QUARTIER-NNN` pour une ville sans communes (Daloa), `VILLE-COMMUNE-QUARTIER-NNN` pour une ville découpée en communes (Abidjan).
 - **Aucun numéro d'urgence imprimé sur les supports.** Les numéros des services (Police, GSPM, SAMU…) sont gérés dans la table des partenaires, côté centrale.
-- Le QR encode **un jeton opaque** (`https://apsig.online/s/<jeton>`), jamais le code lisible. Régénérer un QR révoque l'ancien (réponse « révoqué, appelez les secours »).
+- Le QR encode **un jeton opaque** (`https://code-secours.apsig.online/s/<jeton>`), jamais le code lisible. Régénérer un QR révoque l'ancien (réponse « révoqué, appelez les secours »).
 - La page publique n'affiche **jamais** le nom des personnes : seulement le type de support et, pour un support fixe, le quartier.
 - Un abonnement expiré **n'empêche jamais** le traitement d'une urgence.
 
@@ -93,15 +93,17 @@ Source unique dans le code : `packages/domain/src/forfaits.ts` (trois formules `
 
 Le **premier mois est compris** dans l'abonnement ; la mensualité court dès le deuxième mois. **Provisoire** : supports fournis = plaque + QR intérieur.
 
-Les inscriptions en ligne (`code-secours.apsig.online`, `apps/inscription`) déposent une demande sans paiement ; un conseiller rappelle.
+Les inscriptions en ligne (`apps/inscription`) déposent une demande sans paiement ; un conseiller rappelle.
 
 **Inscription en deux temps** (précisée le 13/11/2026) :
 1. **Recensement** par un agent de terrain (centrale web `/recensement`, puis application mobile) : type de client ; pour une entreprise ou une autre organisation, numéro du registre du commerce (RCCM) ; nom, prénoms, téléphone 1, téléphone 2 (facultatif), ville / commune / quartier du référentiel APSIG, adresse ou repère le plus précis possible ; encaissement des 10 000 F ou « pas encore payé ». À la validation, le **code Code-Secours** (code de la plaque, `DAL-LOBIA-053`) et les **QR** (plaque et intérieur) sont générés.
 2. **Pose de la plaque** (centrale web `/pose`), qui conclut l'inscription : code de la plaque, personne à contacter (nom et prénoms du représentant présent), position GPS relevée sur place **à 5 m près**, photo de la plaque posée et photo de la remise des codes QR. Les preuves sont visibles dans la fiche du foyer.
 
+**Adresses** (16/11/2026) : `apsig.online` devient le site officiel d'APSIG ; la page d'alerte ouverte par les QR passe sur `code-secours.apsig.online`. Les premiers QR imprimés portent `apsig.online/s/<jeton>` : tant que ce domaine sert encore la page d'alerte, ils fonctionnent ; le site officiel devra rediriger `/s/*` vers `code-secours.apsig.online`.
+
 **Trois sites** (décidés le 14/11/2026), une même application web :
 - `centrale.apsig.online` : le personnel qui reçoit et traite les alertes (centrale, carte, supervision) ;
-- `op.apsig.online` (décidé le 16/11/2026 ; `code-secours.apsig.online`, l'ancienne adresse, y mène aussi) : le terrain. Recenseurs et chefs d'équipe recensent ; les poseurs voient les clients à équiper de **leurs communes** (zones attribuées par le chef d'équipe ou le QG) et concluent l'inscription. Le formulaire public d'inscription est supprimé ;
+- `op.apsig.online` (décidé le 16/11/2026) : le terrain. Recenseurs et chefs d'équipe recensent ; les poseurs voient les clients à équiper de **leurs communes** (zones attribuées par le chef d'équipe ou le QG) et concluent l'inscription. Le formulaire public d'inscription est supprimé ;
 - `base.apsig.online` : le QG. Personnel (comptes, équipes, journal), abonnements, finance (encaissements, soldes, mensualités, commissions), forfaits (création, prix, retrait, migration des abonnés), prestataires et intervenants.
 
 Travail dissocié : le recenseur recense, le poseur pose. Recenseurs et poseurs se connectent au téléphone, sans double authentification.

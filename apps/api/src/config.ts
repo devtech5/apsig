@@ -6,8 +6,8 @@ const envFile = path.resolve(import.meta.dirname, "../../../.env");
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const liste = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-// Site terrain : op.X ; code-secours.X, son ancienne adresse, reste ouverte.
-const PREFIXES_SITES = ["centrale.", "op.", "code-secours.", "base."];
+// Sites du back-office : centrale, terrain (op.X) et QG. code-secours.X sert la page d'alerte, pas le back-office.
+const PREFIXES_SITES = ["centrale.", "op.", "base."];
 export const sitesDe = (centrale: string) =>
   /^https?:\/\/centrale\./.test(centrale) ? PREFIXES_SITES.map((p) => centrale.replace("centrale.", p)) : [centrale];
 
@@ -22,7 +22,7 @@ export const config = {
   // Adresse de la centrale : les cookies de session sont posés sur ce domaine (l'API y est relayée).
   centraleUrl: process.env.CENTRALE_URL ?? "http://localhost:3002",
   // Les trois sites du back-office (centrale, terrain, QG) relaient l'API : chacun est une origine de connexion.
-  // BACKOFFICE_URLS les liste ; à défaut, ils se déduisent de CENTRALE_URL (centrale.X → op.X, code-secours.X, base.X).
+  // BACKOFFICE_URLS les liste ; à défaut, ils se déduisent de CENTRALE_URL (centrale.X → op.X, base.X).
   backOfficeUrls: liste(process.env.BACKOFFICE_URLS).length
     ? liste(process.env.BACKOFFICE_URLS)
     : sitesDe(process.env.CENTRALE_URL ?? "http://localhost:3002"),
