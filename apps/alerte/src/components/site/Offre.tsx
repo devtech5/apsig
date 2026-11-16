@@ -1,4 +1,4 @@
-import { CIBLES, FORFAIT_UNIQUE, LIBELLES_CIBLE_DETAILLES, MENSUALITES_FCFA, type Cible } from "@apsig/domain";
+import { CIBLES, FORFAIT_UNIQUE, MENSUALITES_FCFA, type Cible } from "@apsig/domain";
 import { Icone, type NomIcone } from "./Icone";
 
 export const francs = (n: number) => `${n.toLocaleString("fr-FR").replace(/\s/g, " ")} F`;
@@ -17,12 +17,17 @@ const GARANTIES: { titre: string; texte: string }[] = [
   { titre: "Une plaque perdue ? Elle est désactivée", texte: "Un QR remplacé ne déclenche plus rien : le nouveau prend le relais." },
 ];
 
-const MOIS = ["Particulier", "Famille", "Entreprise"] as const;
+// Détail de chaque profil, sous son nom (sans répéter le nom lui-même).
+const PROFILS: Record<Cible, { nom: string; detail: string }> = {
+  PARTICULIER: { nom: "Particulier", detail: "Une personne" },
+  FAMILLE: { nom: "Famille", detail: "Tout le foyer protégé" },
+  ENTREPRISE: { nom: "Entreprise", detail: "Et autres organisations : ONG, mutuelle…" },
+};
 
 export function Centrale() {
   return (
     <section id="centrale" aria-labelledby="titre-centrale" className="trame scroll-mt-20 bg-nuit text-white">
-      <div className="mx-auto grid max-w-6xl gap-14 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:gap-14 sm:px-6 sm:py-20 lg:grid-cols-[1fr_1.2fr] lg:items-center">
         <div>
           <p className="text-sm font-bold tracking-[0.2em] text-orange uppercase">La centrale APSIG</p>
           <h2 id="titre-centrale" className="mt-3 font-titre text-3xl leading-tight font-extrabold tracking-tight sm:text-5xl">
@@ -33,7 +38,7 @@ export function Centrale() {
             relation les personnes qui peuvent agir.
           </p>
           {/* Bouton d'urgence et ses ondes : l'alerte qui arrive à la centrale. */}
-          <div aria-hidden="true" className="relative mt-12 grid size-40 place-items-center">
+          <div aria-hidden="true" className="relative mt-12 hidden size-40 place-items-center lg:grid">
             <span className="onde absolute inset-0 rounded-full bg-signal/50" />
             <span className="onde-2 absolute inset-0 rounded-full bg-signal/40" />
             <span className="relative grid size-24 place-items-center rounded-full bg-signal font-titre text-xl font-black shadow-[0_20px_40px_-12px_rgb(200_16_46_/_0.9)]">
@@ -41,12 +46,14 @@ export function Centrale() {
             </span>
           </div>
         </div>
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           {CENTRALE.map((c) => (
-            <li key={c.titre} className="rounded-3xl bg-white/[0.06] p-6 ring-1 ring-white/10 backdrop-blur">
+            <li key={c.titre} className="grid grid-cols-[auto_1fr] gap-4 rounded-3xl bg-white/[0.06] p-5 ring-1 ring-white/10 backdrop-blur sm:block sm:p-6">
               <Icone nom={c.icone} className="size-6 text-orange" />
-              <h3 className="mt-4 font-titre text-lg font-bold">{c.titre}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/70">{c.texte}</p>
+              <div>
+                <h3 className="font-titre text-lg font-bold sm:mt-4">{c.titre}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-white/70 sm:mt-2">{c.texte}</p>
+              </div>
             </li>
           ))}
         </ul>
@@ -57,7 +64,7 @@ export function Centrale() {
 
 export function Tarifs() {
   return (
-    <section id="tarifs" aria-labelledby="titre-tarifs" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
+    <section id="tarifs" aria-labelledby="titre-tarifs" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-14 sm:px-6 sm:py-20">
       <div className="text-center">
         <p className="text-sm font-bold tracking-[0.2em] text-signal uppercase">Tarifs de lancement</p>
         <h2 id="titre-tarifs" className="mx-auto mt-3 max-w-2xl font-titre text-3xl leading-tight font-extrabold tracking-tight sm:text-5xl">
@@ -65,11 +72,11 @@ export function Tarifs() {
         </h2>
       </div>
 
-      <div className="mt-12 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="relative overflow-hidden rounded-3xl bg-marine p-8 text-white">
+      <div className="mt-8 grid gap-6 sm:mt-12 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="relative overflow-hidden rounded-3xl bg-marine p-6 text-white sm:p-8">
           <div aria-hidden="true" className="absolute -top-20 -right-20 size-64 rounded-full bg-signal/30 blur-2xl" />
           <p className="relative text-sm font-semibold text-white/70">À l'inscription</p>
-          <p className="relative mt-2 font-titre text-6xl font-extrabold tracking-tight">{francs(FORFAIT_UNIQUE.abonnementFcfa)}</p>
+          <p className="relative mt-2 font-titre text-5xl font-extrabold tracking-tight sm:text-6xl">{francs(FORFAIT_UNIQUE.abonnementFcfa)}</p>
           <p className="relative mt-1 text-white/70">Premier mois de service compris</p>
           <ul className="relative mt-8 grid gap-3">
             {["Plaque portail avec votre code", "QR code intérieur", "Pose de la plaque et adresse vérifiée au GPS", "Accès à la centrale APSIG 24h/24"].map((l) => (
@@ -88,16 +95,13 @@ export function Tarifs() {
           {CIBLES.map((c: Cible, i) => (
             <div
               key={c}
-              className={`flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 ring-1 ${i === 1 ? "ring-2 ring-signal" : "ring-ligne"}`}
+              className={`flex items-center justify-between gap-4 rounded-3xl bg-white p-5 ring-1 sm:p-6 ${i === 1 ? "ring-2 ring-signal" : "ring-ligne"}`}
             >
-              <div>
-                <p className="flex items-center gap-2 font-titre text-xl font-bold">
-                  {MOIS[i]}
-                  {i === 1 && <span className="rounded-full bg-signal px-2 py-0.5 text-xs font-bold text-white">Tout le foyer</span>}
-                </p>
-                <p className="text-sm text-attenue">{LIBELLES_CIBLE_DETAILLES[c]}</p>
+              <div className="min-w-0">
+                <p className="font-titre text-lg font-bold sm:text-xl">{PROFILS[c].nom}</p>
+                <p className="text-sm text-attenue">{PROFILS[c].detail}</p>
               </div>
-              <p className="font-titre text-3xl font-extrabold">
+              <p className="shrink-0 text-right font-titre text-2xl font-extrabold sm:text-3xl">
                 {francs(MENSUALITES_FCFA[c])}
                 <span className="text-base font-semibold text-attenue">/mois</span>
               </p>
@@ -115,7 +119,7 @@ export function Tarifs() {
 export function Garanties() {
   return (
     <section aria-labelledby="titre-garanties" className="border-y border-ligne bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
         <h2 id="titre-garanties" className="font-titre text-2xl font-extrabold tracking-tight sm:text-3xl">
           Pensé pour protéger, jamais pour exposer.
         </h2>

@@ -27,7 +27,7 @@ const QUESTIONS: { q: string; r: string }[] = [
 
 export function Questions() {
   return (
-    <section id="questions" aria-labelledby="titre-questions" className="mx-auto grid max-w-6xl scroll-mt-20 gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[0.8fr_1.2fr]">
+    <section id="questions" aria-labelledby="titre-questions" className="mx-auto grid max-w-6xl scroll-mt-20 gap-6 px-4 py-14 sm:gap-10 sm:px-6 sm:py-20 lg:grid-cols-[0.8fr_1.2fr]">
       <div>
         <p className="text-sm font-bold tracking-[0.2em] text-signal uppercase">Questions fréquentes</p>
         <h2 id="titre-questions" className="mt-3 font-titre text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl">Ce qu'on nous demande le plus souvent.</h2>
@@ -35,7 +35,7 @@ export function Questions() {
       <div className="divide-y divide-ligne border-y border-ligne">
         {QUESTIONS.map((x) => (
           <details key={x.q} className="group py-5">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-titre text-lg font-bold [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-titre text-base font-bold sm:text-lg [&::-webkit-details-marker]:hidden">
               {x.q}
               <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-sable text-xl transition group-open:rotate-45">
                 +

@@ -15,7 +15,7 @@ const SUPPORTS: Support[] = [
 export function Supports() {
   const [plaque, interieur, ...options] = SUPPORTS;
   return (
-    <section id="supports" aria-labelledby="titre-supports" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
+    <section id="supports" aria-labelledby="titre-supports" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-14 sm:px-6 sm:py-20">
       <p className="text-sm font-bold tracking-[0.2em] text-signal uppercase">Les supports</p>
       <div className="mt-3 grid gap-6 lg:grid-cols-2 lg:items-end">
         <h2 id="titre-supports" className="font-titre text-3xl leading-tight font-extrabold tracking-tight sm:text-5xl">Un QR code là où l'urgence peut arriver.</h2>
@@ -25,21 +25,21 @@ export function Supports() {
         </p>
       </div>
 
-      <div className="mt-12 grid gap-4 lg:grid-cols-6">
+      <div className="mt-8 grid gap-3 sm:mt-12 sm:gap-4 lg:grid-cols-6">
         {/* Les deux supports du forfait, mis en avant. */}
         {[plaque!, interieur!].map((s, i) => (
-          <article key={s.nom} className={`relative overflow-hidden rounded-3xl p-7 lg:col-span-3 ${i === 0 ? "bg-marine text-white" : "bg-white ring-1 ring-ligne"}`}>
+          <article key={s.nom} className={`relative overflow-hidden rounded-3xl p-6 sm:p-7 lg:col-span-3 ${i === 0 ? "bg-marine text-white" : "bg-white ring-1 ring-ligne"}`}>
             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${i === 0 ? "bg-white/15" : "bg-vert-clair text-vert"}`}>
               <Icone nom="check" className="size-3.5" /> Inclus dans le forfait
             </span>
             <h3 className="mt-5 font-titre text-2xl font-extrabold">{s.nom}</h3>
             <p className={`text-sm font-semibold ${i === 0 ? "text-white/60" : "text-signal"}`}>{s.usage}</p>
-            <p className={`mt-3 max-w-sm leading-relaxed ${i === 0 ? "text-white/80" : "text-attenue"}`}>{s.detail}</p>
-            <QrDecoratif className={`absolute -right-6 -bottom-6 w-36 rotate-12 rounded-xl opacity-90 ${i === 0 ? "text-marine" : "text-nuit"}`} />
+            <p className={`relative z-10 mt-3 max-w-[70%] leading-relaxed sm:max-w-sm ${i === 0 ? "text-white/80" : "text-attenue"}`}>{s.detail}</p>
+            <QrDecoratif className={`absolute -right-5 -bottom-5 w-24 rotate-12 rounded-xl opacity-90 sm:-right-6 sm:-bottom-6 sm:w-36 ${i === 0 ? "text-marine" : "text-nuit"}`} />
           </article>
         ))}
         {options.map((s) => (
-          <article key={s.nom} className="rounded-3xl border border-dashed border-ligne bg-white/60 p-6 lg:col-span-2">
+          <article key={s.nom} className="rounded-3xl border border-dashed border-ligne bg-white/60 p-5 sm:p-6 lg:col-span-2">
             <div className="flex items-center justify-between gap-3">
               <span className="grid size-11 place-items-center rounded-xl bg-brand-clair text-brand">
                 <Icone nom={s.icone} className="size-5" />

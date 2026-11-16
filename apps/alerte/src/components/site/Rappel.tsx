@@ -33,7 +33,7 @@ export function Rappel() {
 
   return (
     <section id="rappel" aria-labelledby="titre-rappel" className="trame scroll-mt-20 bg-marine text-white">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 sm:gap-12 sm:px-6 sm:py-20 lg:grid-cols-[0.9fr_1.1fr]">
         <div>
           <p className="text-sm font-bold tracking-[0.2em] text-orange uppercase">Inscription</p>
           <h2 id="titre-rappel" className="mt-3 font-titre text-3xl leading-tight font-extrabold tracking-tight sm:text-5xl">
@@ -63,16 +63,16 @@ export function Rappel() {
             </p>
           </div>
         ) : (
-          <form onSubmit={soumettre} className="grid gap-5 rounded-3xl bg-white p-6 text-encre shadow-2xl sm:p-8">
+          <form onSubmit={soumettre} className="grid gap-5 rounded-3xl bg-white p-5 text-encre shadow-2xl sm:p-8">
             <fieldset className="grid gap-2">
               <legend className="mb-2 text-sm font-semibold">Vous êtes</legend>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-3 gap-2">
                 {CIBLES.map((c: Cible) => {
                   const choisi = d.cible === c;
                   return (
                     <label
                       key={c}
-                      className={`grid cursor-pointer gap-0.5 rounded-xl border-2 px-3 py-2.5 transition ${choisi ? "border-brand bg-brand-clair/50" : "border-ligne hover:border-brand/40"}`}
+                      className={`grid cursor-pointer gap-0.5 rounded-xl border-2 px-2.5 py-2.5 text-center transition sm:px-3 sm:text-left ${choisi ? "border-brand bg-brand-clair/50" : "border-ligne hover:border-brand/40"}`}
                     >
                       <input type="radio" name="cible" value={c} checked={choisi} onChange={() => maj("cible", c)} className="sr-only" />
                       <span className="font-bold">{LIBELLES_CIBLE[c]}</span>
@@ -120,7 +120,9 @@ export function Rappel() {
               </label>
             </div>
             <label className={etiquette}>
-              Message <span className="font-normal text-attenue">(facultatif)</span>
+              <span>
+                Message <span className="font-normal text-attenue">(facultatif)</span>
+              </span>
               <textarea maxLength={500} rows={2} value={d.message} onChange={(e) => maj("message", e.target.value)} className={champ} />
             </label>
 

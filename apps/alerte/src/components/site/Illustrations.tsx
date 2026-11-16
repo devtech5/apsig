@@ -41,22 +41,23 @@ export function QrDecoratif({ className = "" }: { className?: string }) {
 }
 
 // Plaque portail : aluminium, seulement le code de la plaque et le QR (aucun nom, aucun numéro imprimé).
-export function Plaque({ className = "w-56" }: { className?: string }) {
+// className fixe la position : « relative » par défaut, « absolute » pour la superposer (les rivets s'y accrochent).
+export function Plaque({ className = "relative w-56" }: { className?: string }) {
   return (
     <figure
       aria-label="Plaque portail CODE-SECOURS : un code et un QR, sans nom ni adresse"
-      className={`relative grid gap-3 rounded-[1.4rem] bg-gradient-to-br from-white via-[#eef1f5] to-[#cfd6e0] p-4 shadow-[0_30px_60px_-20px_rgb(11_26_58_/_0.55)] ring-1 ring-white/70 ${className}`}
+      className={`grid gap-2 rounded-[1.2rem] bg-gradient-to-br from-white via-[#eef1f5] to-[#cfd6e0] p-3 sm:gap-3 sm:rounded-[1.4rem] sm:p-4 shadow-[0_30px_60px_-20px_rgb(11_26_58_/_0.55)] ring-1 ring-white/70 ${className}`}
     >
       {[["top-2.5 left-2.5"], ["top-2.5 right-2.5"], ["bottom-2.5 left-2.5"], ["bottom-2.5 right-2.5"]].map(([p]) => (
         <span key={p} aria-hidden="true" className={`absolute ${p} size-2 rounded-full bg-gradient-to-br from-slate-300 to-slate-500 ring-1 ring-white`} />
       ))}
-      <div className="flex items-center justify-center gap-2 rounded-xl bg-marine px-3 py-2 text-white">
+      <div className="flex items-center justify-center gap-1.5 rounded-xl bg-marine px-2 py-1.5 text-white sm:gap-2 sm:px-3 sm:py-2">
         <img src="/logo-apsig.svg" alt="" width={18} height={20} className="h-5 w-[18px]" />
-        <span className="font-titre text-xs font-extrabold tracking-wide whitespace-nowrap sm:text-sm">CODE-SECOURS</span>
+        <span className="font-titre text-[10px] font-extrabold tracking-wide whitespace-nowrap sm:text-sm">CODE-SECOURS</span>
         <span className="rounded bg-orange px-1 text-xs font-black">CI</span>
       </div>
       <QrDecoratif className="mx-auto w-[72%] text-nuit" />
-      <p className="text-center font-mono text-sm font-bold tracking-[0.18em] text-nuit">DAL-LOBIA-053</p>
+      <p className="text-center font-mono text-[10px] font-bold tracking-[0.1em] text-nuit sm:text-sm sm:tracking-[0.18em]">DAL-LOBIA-053</p>
     </figure>
   );
 }

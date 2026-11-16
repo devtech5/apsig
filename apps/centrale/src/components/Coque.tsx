@@ -35,12 +35,15 @@ export function Coque({ children }: { children: React.ReactNode }) {
   // Sites où ce compte travaille, quand ce n'est pas celui-ci.
   const ailleurs = [...new Set(compte.espaces.map((e) => SITE_ESPACE[e]).filter((s) => s != null))].filter((s) => s !== site);
   const contenu = horsSite ? null : children;
+  // Mot de passe provisoire à remplacer ou double authentification à activer : seule la page Sécurité est ouverte,
+  // la navigation est masquée (barre du haut comme barre latérale du QG).
+  const restreint = compte.motDePasseProvisoire || compte.deuxFacteursRequis;
 
   // QG : barre latérale et tableau de bord (les deux autres sites gardent la barre du haut).
-  if (site === "base") {
+  if (site === "base" && !restreint) {
     return (
       <CoqueQg liens={liens} ailleurs={ailleurs}>
-        {!compte.deuxFacteursRequis && liens.length === 0 && <HorsSite ailleurs={ailleurs} />}
+        {!restreint && liens.length === 0 && <HorsSite ailleurs={ailleurs} />}
         {contenu}
       </CoqueQg>
     );
@@ -56,7 +59,7 @@ export function Coque({ children }: { children: React.ReactNode }) {
             <span className="block text-[11px] text-white/70">{site === "tout" ? "CODE-SECOURS CI" : NOMS_SITE[site].titre.toUpperCase()}</span>
           </span>
         </Link>
-        {!compte.deuxFacteursRequis && (
+        {!restreint && (
           <nav aria-label="Espaces" className="mr-auto flex flex-wrap gap-1">
             {liens.map((n) => (
               <Link
@@ -75,7 +78,7 @@ export function Coque({ children }: { children: React.ReactNode }) {
         <Menu />
       </header>
       {centrale?.file?.crise.actif && <BandeauCrise />}
-      {!compte.deuxFacteursRequis && liens.length === 0 && <HorsSite ailleurs={ailleurs} />}
+      {!restreint && liens.length === 0 && <HorsSite ailleurs={ailleurs} />}
       <div className="flex-1">{contenu}</div>
     </div>
   );

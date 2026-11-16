@@ -11,17 +11,31 @@ export function PiedDePage() {
     <footer className="bg-nuit text-white">
       {/* Rappel permanent : le service facilite la transmission, il ne remplace pas les numéros publics. */}
       <div className="border-b border-white/10 bg-signal">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-4 text-sm sm:px-6">
-          <p className="font-bold">Urgence vitale ? Appelez d'abord :</p>
-          {NUMEROS.map((n) => (
-            <a key={n.numero} href={`tel:${n.numero}`} className="inline-flex items-center gap-1.5 font-semibold hover:underline">
-              <Icone nom="telephone" className="size-4" /> {n.service} <span className="font-mono font-bold">{n.numero}</span>
-            </a>
-          ))}
+        <div className="mx-auto grid max-w-6xl gap-3 px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-6 sm:px-6">
+          <p className="text-center text-sm font-bold sm:text-left">Urgence vitale ? Appelez d'abord :</p>
+          <ul className="grid grid-cols-3 gap-2 sm:flex sm:gap-6">
+            {NUMEROS.map((n) => (
+              <li key={n.numero}>
+                <a
+                  href={`tel:${n.numero}`}
+                  className="grid justify-items-center gap-0.5 rounded-xl bg-white/15 px-2 py-2 ring-1 ring-white/25 hover:bg-white/25 sm:inline-flex sm:items-center sm:gap-1.5 sm:bg-transparent sm:p-0 sm:ring-0 sm:hover:bg-transparent sm:hover:underline"
+                >
+                  <span className="flex items-center gap-1.5 font-mono text-lg font-bold sm:order-2 sm:text-sm">
+                    <Icone nom="telephone" className="size-4 sm:hidden" />
+                    {n.numero}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs font-semibold sm:order-1 sm:text-sm">
+                    <Icone nom="telephone" className="hidden size-4 sm:block" />
+                    {n.service}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
-        <div>
+      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-[1.4fr_1fr_1fr] md:gap-10">
+        <div className="col-span-2 md:col-span-1">
           <div className="flex items-center gap-2.5">
             <img src="/logo-apsig.svg" alt="" width={32} height={36} className="h-9 w-8" />
             <span className="leading-tight">
