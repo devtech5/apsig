@@ -42,6 +42,7 @@ export function creerAuth(db: PrismaClient) {
       additionalFields: {
         role: { type: "string", input: false },
         actif: { type: "boolean", input: false },
+        motDePasseProvisoire: { type: "boolean", input: false },
       },
     },
     account: { modelName: "compte" },

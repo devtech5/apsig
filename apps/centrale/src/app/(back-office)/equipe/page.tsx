@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { cleLieu, LIBELLES_ROLE, type Role } from "@apsig/domain";
+import { cleLieu, LIBELLES_ROLE, MOT_DE_PASSE, type Role } from "@apsig/domain";
 import { ListeSaisie } from "@/components/ListeSaisie";
 import { Bloc, BOUTON, BOUTON_DISCRET, CHAMP, Champ, Erreur, valeur } from "@/components/Formulaire";
 import { useSession } from "@/components/Session";
@@ -66,7 +66,12 @@ export default function PageEquipe() {
     const form = e.currentTarget;
     const d = new FormData(form);
     const r = await executer(() =>
-      appelApi<{ compte: { identifiant: string }; motDePasse: string }>("/equipe/membres", { nom: valeur(d, "nom"), telephone: valeur(d, "telephone"), role: d.get("role") }),
+      appelApi<{ compte: { identifiant: string }; motDePasse: string }>("/equipe/membres", {
+        nom: valeur(d, "nom"),
+        telephone: valeur(d, "telephone"),
+        role: d.get("role"),
+        motDePasse: valeur(d, "motDePasse") ?? undefined,
+      }),
     );
     if (r) {
       setSecret({ pour: r.compte.identifiant, motDePasse: r.motDePasse });
@@ -119,8 +124,8 @@ export default function PageEquipe() {
       {secret && (
         <div role="status" className="grid gap-2 rounded-2xl border-2 border-brand bg-brand-clair p-4">
           <p className="text-sm">
-            Mot de passe de <strong>{secret.pour}</strong>, affiché une seule fois. Remettez-le en main propre au recenseur : il se connecte sur centrale.apsig.online avec son
-            téléphone et ce mot de passe.
+            Mot de passe provisoire de <strong>{secret.pour}</strong>, affiché une seule fois. Remettez-le en main propre : la personne se connecte sur
+            code-secours.apsig.online (ou l'application mobile) avec son téléphone et ce mot de passe, puis le remplace par le sien à la première connexion.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <code className="rounded-lg bg-white px-3 py-2 font-mono text-lg font-bold tracking-wider select-all">{secret.motDePasse}</code>
@@ -135,7 +140,7 @@ export default function PageEquipe() {
       )}
 
       <Bloc titre="Inscrire un membre de l'équipe">
-        <form onSubmit={creer} className="grid gap-3 sm:grid-cols-[1fr_1fr_11rem_auto] sm:items-end">
+        <form onSubmit={creer} className="grid gap-3 sm:grid-cols-2 sm:items-end lg:grid-cols-[1fr_1fr_11rem_1fr_auto]">
           <Champ libelle="Nom et prénoms">
             <input name="nom" required minLength={2} maxLength={80} className={CHAMP} />
           </Champ>
@@ -147,6 +152,9 @@ export default function PageEquipe() {
               <option value="RECENSEUR">Recenseur</option>
               <option value="AGENT">Poseur de plaques</option>
             </select>
+          </Champ>
+          <Champ libelle="Mot de passe provisoire" aide="Facultatif : généré s'il est vide.">
+            <input name="motDePasse" type="text" autoComplete="off" spellCheck={false} minLength={MOT_DE_PASSE.provisoireMin} maxLength={MOT_DE_PASSE.max} className={CHAMP} />
           </Champ>
           <button disabled={envoi} className={BOUTON}>
             Créer le compte

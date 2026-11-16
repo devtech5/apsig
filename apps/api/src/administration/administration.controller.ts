@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, UseGuards }
 import { z } from "zod";
 import { ROLES, ROLES_TELEPHONE, STATUTS_UNITE, TYPES_UNITE } from "@apsig/domain";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
+import { motDePasseProvisoire } from "../auth/comptes.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { AdministrationService } from "./administration.service.ts";
 
@@ -13,6 +14,8 @@ const creation = z
     telephone: z.string().trim().max(20).optional(),
     role: z.enum(ROLES),
     chefId: z.string().min(1).nullable().optional(),
+    // Mot de passe provisoire choisi par l'administrateur ; généré s'il est absent.
+    motDePasse: motDePasseProvisoire.optional(),
   })
   .refine((d) => ((ROLES_TELEPHONE as readonly string[]).includes(d.role) ? d.telephone : d.email), {
     message: "E-mail requis (téléphone pour un recenseur ou un poseur)",

@@ -15,7 +15,7 @@ export function useSession() {
 }
 
 // Compte connecté, partagé par toutes les pages du back-office. Sans session : page de connexion ;
-// double authentification pas encore activée : page Sécurité, seule accessible.
+// mot de passe provisoire à remplacer ou double authentification pas encore activée : page Sécurité, seule accessible.
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const chemin = usePathname();
@@ -43,9 +43,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [erreur, recharger]);
 
+  const restreint = !!compte && (compte.motDePasseProvisoire || compte.deuxFacteursRequis);
   useEffect(() => {
-    if (compte?.deuxFacteursRequis && chemin !== "/securite") router.replace("/securite");
-  }, [compte, chemin, router]);
+    if (restreint && chemin !== "/securite") router.replace("/securite");
+  }, [restreint, chemin, router]);
 
   const deconnecter = useCallback(async () => {
     await appelApi("/auth/sign-out", {}).catch(() => null);
@@ -60,6 +61,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       </p>
     );
   }
-  if (compte.deuxFacteursRequis && chemin !== "/securite") return null;
+  if (restreint && chemin !== "/securite") return null;
   return <Contexte value={{ compte, recharger, deconnecter }}>{children}</Contexte>;
 }

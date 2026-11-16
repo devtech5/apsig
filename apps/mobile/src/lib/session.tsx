@@ -32,7 +32,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return setSession({ type: "abonne", jeton, prenom });
       }
       const compte = await comptePersonnel().catch(() => null);
-      setSession(compte ? { type: "personnel", compte } : { type: "aucune" });
+      // Mot de passe provisoire pas encore remplacé (application quittée en cours de route) : retour à la connexion.
+      if (compte?.motDePasseProvisoire) await deconnecterPersonnel().catch(() => undefined);
+      setSession(compte && !compte.motDePasseProvisoire ? { type: "personnel", compte } : { type: "aucune" });
     })();
   }, []);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { LIBELLES_ROLE, LIBELLES_STATUT_UNITE, LIBELLES_TYPE_UNITE, peutGererRole, ROLES, ROLES_TELEPHONE, TYPES_UNITE, type Role, type StatutUnite } from "@apsig/domain";
+import { LIBELLES_ROLE, LIBELLES_STATUT_UNITE, LIBELLES_TYPE_UNITE, MOT_DE_PASSE, peutGererRole, ROLES, ROLES_TELEPHONE, TYPES_UNITE, type Role, type StatutUnite } from "@apsig/domain";
 import { Bloc, BOUTON, BOUTON_DISCRET, CHAMP, Champ, Erreur, valeur } from "@/components/Formulaire";
 import { useSession } from "@/components/Session";
 import { appelApi } from "@/lib/api";
@@ -26,7 +26,8 @@ type CompteAdmin = {
 type UniteAdmin = { id: string; nom: string; type: string; libelleType: string; statut: StatutUnite; agents: { id: string; nom: string; actif: boolean }[] };
 type Journal = { total: number; page: number; parPage: number; entrees: { id: string; le: string; action: string; cible: string; details: unknown; auteur: string | null }[] };
 
-// Mot de passe à remettre en main propre : affiché une seule fois, jamais stocké en clair.
+// Mot de passe provisoire à remettre en main propre : affiché une seule fois, jamais stocké en clair ;
+// la personne le remplace par le sien à sa première connexion.
 type Secret = { pour: string; motDePasse: string };
 
 const FAMILLES_AUDIT: [string, string][] = [
@@ -84,8 +85,8 @@ export default function PageAdministration() {
       appelApi<{ compte: { identifiant: string }; motDePasse: string }>(
         "/administration/comptes",
         auTelephone
-          ? { nom: valeur(d, "nom"), telephone: valeur(d, "telephone"), role: roleNouveau, chefId: valeur(d, "chefId") }
-          : { nom: valeur(d, "nom"), email: valeur(d, "email"), role: roleNouveau },
+          ? { nom: valeur(d, "nom"), telephone: valeur(d, "telephone"), role: roleNouveau, chefId: valeur(d, "chefId"), motDePasse: valeur(d, "motDePasse") ?? undefined }
+          : { nom: valeur(d, "nom"), email: valeur(d, "email"), role: roleNouveau, motDePasse: valeur(d, "motDePasse") ?? undefined },
       ),
     );
     if (r) {
@@ -131,8 +132,8 @@ export default function PageAdministration() {
       {secret && (
         <div role="status" className="grid gap-2 rounded-2xl border-2 border-brand bg-brand-clair p-4">
           <p className="text-sm">
-            Mot de passe de <strong>{secret.pour}</strong>, à remettre en main propre. Il ne sera plus affiché ; la personne activera sa double authentification à la
-            première connexion.
+            Mot de passe provisoire de <strong>{secret.pour}</strong>, à remettre en main propre. Il ne sera plus affiché. À sa première connexion, la personne le
+            remplace par un mot de passe personnel, puis active sa double authentification si son rôle l'exige.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <code className="rounded-lg bg-white px-3 py-2 font-mono text-lg font-bold tracking-wider select-all">{secret.motDePasse}</code>
@@ -147,7 +148,7 @@ export default function PageAdministration() {
       )}
 
       <Bloc titre="Nouveau compte">
-        <form onSubmit={creer} className="grid gap-3 sm:grid-cols-[1fr_1fr_12rem_auto] sm:items-end">
+        <form onSubmit={creer} className="grid gap-3 sm:grid-cols-2 sm:items-end lg:grid-cols-3">
           <Champ libelle="Nom">
             <input name="nom" required minLength={2} maxLength={80} className={CHAMP} />
           </Champ>
@@ -181,6 +182,9 @@ export default function PageAdministration() {
               </select>
             </Champ>
           )}
+          <Champ libelle="Mot de passe provisoire" aide="Facultatif : généré s'il est laissé vide. À changer à la première connexion.">
+            <input name="motDePasse" type="text" autoComplete="off" spellCheck={false} minLength={MOT_DE_PASSE.provisoireMin} maxLength={MOT_DE_PASSE.max} className={CHAMP} />
+          </Champ>
           <button disabled={envoi} className={BOUTON}>
             Créer
           </button>

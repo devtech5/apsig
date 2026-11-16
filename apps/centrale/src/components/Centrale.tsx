@@ -57,9 +57,9 @@ export function doitSonner(file: FileCentrale, supervision: boolean) {
 
 export function CentraleProvider({ children }: { children: React.ReactNode }) {
   const { compte } = useSession();
-  // Avant l'activation de la double authentification, seule la page Sécurité est ouverte.
+  // Avant le remplacement du mot de passe provisoire et l'activation de la double authentification, seule la page Sécurité est ouverte.
   // File, sirène et présence : seulement sur le site de la centrale (pas sur le terrain ni au QG).
-  const actif = compte.espaces.includes("centrale") && !compte.deuxFacteursRequis && espaceSurSite("centrale", siteCourant());
+  const actif = compte.espaces.includes("centrale") && !compte.deuxFacteursRequis && !compte.motDePasseProvisoire && espaceSurSite("centrale", siteCourant());
   return actif ? <FileEnDirect supervision={compte.espaces.includes("supervision")}>{children}</FileEnDirect> : children;
 }
 

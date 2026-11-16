@@ -13,7 +13,15 @@ export const auth = createAuthClient({
 });
 
 export type Espace = "centrale" | "supervision" | "abonnements" | "administration" | "recensement" | "pose" | "equipe" | "terrain";
-export type ComptePersonnel = { id: string; nom: string; email: string; role: string; espaces: Espace[]; deuxFacteursRequis: boolean };
+// motDePasseProvisoire : mot de passe remis par un responsable, à remplacer avant tout accès (POST /compte/mot-de-passe).
+export type ComptePersonnel = { id: string; nom: string; email: string; role: string; espaces: Espace[]; deuxFacteursRequis: boolean; motDePasseProvisoire: boolean };
+
+// Longueurs de @apsig/domain (MOT_DE_PASSE) : mot de passe personnel et mot de passe provisoire remis par un responsable.
+export const MOT_DE_PASSE = { min: 12, provisoireMin: 8 } as const;
+
+export function remplacerMotDePasse(actuel: string, nouveau: string) {
+  return appelPersonnel<{ motDePasseProvisoire: false }>("/compte/mot-de-passe", { corps: { actuel, nouveau } });
+}
 
 // Appel de l'API avec la session du personnel.
 export async function appelPersonnel<T>(chemin: string, options: Parameters<typeof appel>[1] = {}) {

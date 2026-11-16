@@ -2,20 +2,23 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { Linking, Text, TextInput, View } from "react-native";
 import { Bouton, Carte, Ecran, Erreur, styles, Texte } from "@/components/ui";
-import { auth, comptePersonnel, identifiantConnexion, type ComptePersonnel } from "@/lib/personnel";
+import { auth, comptePersonnel, identifiantConnexion, MOT_DE_PASSE, remplacerMotDePasse, type ComptePersonnel } from "@/lib/personnel";
 import { useSession } from "@/lib/session";
 import { COULEURS } from "@/lib/theme";
 
-type Etape = "identifiants" | "code" | "activation";
+type Etape = "identifiants" | "nouveauMotDePasse" | "code" | "activation";
 const ESPACES_MOBILE = ["recensement", "pose", "terrain"];
 
 // Personnel APSIG : mêmes identifiants et même double authentification que la centrale.
 // Les recenseurs se connectent avec leur téléphone, sans double authentification.
+// Première connexion (ou après réinitialisation) : le mot de passe provisoire remis par le responsable est d'abord remplacé.
 export default function Connexion() {
   const { ouvrirPersonnel } = useSession();
   const [etape, setEtape] = useState<Etape>("identifiants");
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
+  const [nouveau, setNouveau] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [code, setCode] = useState("");
   const [totpURI, setTotpURI] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -33,11 +36,16 @@ export default function Connexion() {
     }
   }
 
-  async function entrer(compte: ComptePersonnel | null) {
+  // motDePasseCourant : celui qui vient d'être saisi ou choisi (l'état React n'est pas encore à jour).
+  async function entrer(compte: ComptePersonnel | null, motDePasseCourant = motDePasse) {
     if (!compte) throw new Error("Connexion refusée");
+    if (compte.motDePasseProvisoire) {
+      setEtape("nouveauMotDePasse");
+      return;
+    }
     if (compte.deuxFacteursRequis) {
       // Première connexion : la double authentification s'active ici, avec l'application d'authentification du téléphone.
-      const r = await auth.twoFactor.enable({ password: motDePasse });
+      const r = await auth.twoFactor.enable({ password: motDePasseCourant });
       if (r.error) throw new Error(r.error.message ?? "Activation impossible");
       if (r.data.method !== "totp") throw new Error("Activation impossible");
       setTotpURI(r.data.totpURI);
@@ -62,6 +70,17 @@ export default function Connexion() {
       await entrer(await comptePersonnel());
     });
 
+  const choisirMotDePasse = () =>
+    executer(async () => {
+      if (nouveau !== confirmation) throw new Error("Les deux mots de passe diffèrent");
+      if (nouveau === motDePasse) throw new Error("Choisissez un mot de passe différent du mot de passe provisoire");
+      await remplacerMotDePasse(motDePasse, nouveau);
+      setMotDePasse(nouveau);
+      setNouveau("");
+      setConfirmation("");
+      await entrer(await comptePersonnel(), nouveau);
+    });
+
   const verifier = () =>
     executer(async () => {
       const r = await auth.twoFactor.verifyTotp({ code });
@@ -77,7 +96,26 @@ export default function Connexion() {
           <Champ libelle="E-mail ou téléphone" valeur={email} onChange={setEmail} type="email" />
           <Champ libelle="Mot de passe" valeur={motDePasse} onChange={setMotDePasse} type="motDePasse" />
           <Erreur message={erreur} />
-          <Bouton grand icone="login" libelle="Se connecter" chargement={envoi} desactive={!email || motDePasse.length < 12} onPress={() => void seConnecter()} />
+          <Bouton grand icone="login" libelle="Se connecter" chargement={envoi} desactive={!email || motDePasse.length < MOT_DE_PASSE.provisoireMin} onPress={() => void seConnecter()} />
+        </>
+      )}
+      {etape === "nouveauMotDePasse" && (
+        <>
+          <Carte>
+            <Texte gras>Choisissez votre mot de passe</Texte>
+            <Texte>Le mot de passe qui vous a été remis est provisoire. Remplacez-le par un mot de passe connu de vous seul ({MOT_DE_PASSE.min} caractères au moins).</Texte>
+          </Carte>
+          <Champ libelle="Nouveau mot de passe" valeur={nouveau} onChange={setNouveau} type="nouveau" />
+          <Champ libelle="Confirmation" valeur={confirmation} onChange={setConfirmation} type="nouveau" />
+          <Erreur message={erreur} />
+          <Bouton
+            grand
+            icone="check-circle"
+            libelle="Enregistrer mon mot de passe"
+            chargement={envoi}
+            desactive={nouveau.length < MOT_DE_PASSE.min || confirmation.length < MOT_DE_PASSE.min}
+            onPress={() => void choisirMotDePasse()}
+          />
         </>
       )}
       {etape === "activation" && totpURI && (
@@ -111,7 +149,7 @@ export default function Connexion() {
   );
 }
 
-function Champ({ libelle, valeur, onChange, type }: { libelle: string; valeur: string; onChange: (v: string) => void; type: "email" | "motDePasse" }) {
+function Champ({ libelle, valeur, onChange, type }: { libelle: string; valeur: string; onChange: (v: string) => void; type: "email" | "motDePasse" | "nouveau" }) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.libelle}>{libelle}</Text>
@@ -120,10 +158,10 @@ function Champ({ libelle, valeur, onChange, type }: { libelle: string; valeur: s
         onChangeText={onChange}
         autoCapitalize="none"
         autoCorrect={false}
-        secureTextEntry={type === "motDePasse"}
+        secureTextEntry={type !== "email"}
         keyboardType="default"
-        autoComplete={type === "email" ? "email" : "current-password"}
-        textContentType={type === "email" ? "username" : "password"}
+        autoComplete={type === "email" ? "email" : type === "nouveau" ? "new-password" : "current-password"}
+        textContentType={type === "email" ? "username" : type === "nouveau" ? "newPassword" : "password"}
         style={[styles.champ, { fontSize: 18 }]}
         accessibilityLabel={libelle}
       />

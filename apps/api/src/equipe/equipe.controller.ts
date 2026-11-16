@@ -3,7 +3,7 @@ import { z } from "zod";
 import { aAcces, emailTerrain, ROLES_EQUIPE, type Role } from "@apsig/domain";
 import { affichage } from "../administration/administration.service.ts";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
-import { definirMotDePasse } from "../auth/comptes.ts";
+import { definirMotDePasse, motDePasseProvisoire } from "../auth/comptes.ts";
 import { villeEtCommune } from "../lieux/lieux.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
@@ -15,6 +15,8 @@ const nouveauMembre = z.object({
   role: z.enum(["RECENSEUR", "AGENT"]).default("RECENSEUR"),
   // Administrateur seulement : rattacher le membre à un chef d'équipe.
   chefId: z.string().min(1).nullable().optional(),
+  // Mot de passe provisoire choisi par le chef ; généré s'il est absent.
+  motDePasse: motDePasseProvisoire.optional(),
 });
 // Zones d'un poseur : communes (ou villes entières sans commune), par leur nom.
 const zones = z.object({
@@ -91,7 +93,7 @@ export class EquipeService {
     };
   }
 
-  // Le mot de passe n'est montré qu'une fois : le chef le remet en main propre au recenseur ou au poseur.
+  // Mot de passe provisoire montré une fois : le chef le remet en main propre, le membre le remplace à sa première connexion.
   async creerMembre(d: z.infer<typeof nouveauMembre>, u: UtilisateurConnecte) {
     const email = emailTerrain(d.telephone);
     if (!email) throw new ConflictException("Numéro de téléphone invalide (10 chiffres)");
@@ -101,7 +103,7 @@ export class EquipeService {
       const chef = await this.db.utilisateur.findUnique({ where: { id: chefId } });
       if (!chef || chef.role !== "CHEF_EQUIPE" || !chef.actif) throw new NotFoundException("Chef d'équipe inconnu ou désactivé");
     }
-    const { utilisateur, motDePasse } = await definirMotDePasse(this.db, { email, nom: d.nom, role: d.role });
+    const { utilisateur, motDePasse } = await definirMotDePasse(this.db, { email, nom: d.nom, role: d.role }, d.motDePasse);
     await this.db.utilisateur.update({ where: { id: utilisateur.id }, data: { chefId } });
     await this.auditer(u, "compte.creer", email, { role: d.role, chefId });
     return { compte: { id: utilisateur.id, identifiant: affichage(email) }, motDePasse };

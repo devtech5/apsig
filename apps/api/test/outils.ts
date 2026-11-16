@@ -35,7 +35,8 @@ export function codeTotp(secretBase32: string, maintenant = Date.now()) {
 export async function connecter(app: INestApplication, db: PrismaService, role: RoleUtilisateur, opts: { actif?: boolean } = {}) {
   const email = `${role.toLowerCase()}-${genererJeton(6).toLowerCase()}@apsig.test`;
   const { utilisateur, motDePasse } = await definirMotDePasse(db, { email, nom: `${role} ${genererJeton(4)}`, role });
-  if (opts.actif === false) await db.utilisateur.update({ where: { id: utilisateur.id }, data: { actif: false } });
+  // Compte déjà en service : son mot de passe provisoire a été remplacé à la première connexion.
+  await db.utilisateur.update({ where: { id: utilisateur.id }, data: { motDePasseProvisoire: false, ...(opts.actif === false && { actif: false }) } });
   const agent = request.agent(app.getHttpServer());
   const r = await agent.post("/api/auth/sign-in/email").set("Origin", config.centraleUrl).send({ email, password: motDePasse });
   return { agent, utilisateur, motDePasse, connexion: r };

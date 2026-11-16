@@ -54,16 +54,17 @@ export class AdministrationService {
     }));
   }
 
-  // Le mot de passe généré n'est montré qu'une fois, à l'administrateur, qui le transmet en main propre.
+  // Mot de passe provisoire (choisi par l'administrateur ou généré) : montré une fois, transmis en main propre,
+  // remplacé par la personne à sa première connexion.
   async creerCompte(
-    d: { nom: string; email?: string | undefined; telephone?: string | undefined; role: Role; chefId?: string | null | undefined },
+    d: { nom: string; email?: string | undefined; telephone?: string | undefined; role: Role; chefId?: string | null | undefined; motDePasse?: string | undefined },
     acteur: UtilisateurConnecte,
   ) {
     this.verifierRole(acteur, d.role);
     const email = this.identifiant(d);
     if (await this.db.utilisateur.findUnique({ where: { email } })) throw new ConflictException(`Un compte existe déjà avec ${estEmailTerrain(email) ? "ce téléphone" : "cet e-mail"}`);
     if (d.chefId) await this.verifierChef(d.chefId);
-    const { utilisateur, motDePasse } = await definirMotDePasse(this.db, { email, nom: d.nom, role: d.role });
+    const { utilisateur, motDePasse } = await definirMotDePasse(this.db, { email, nom: d.nom, role: d.role }, d.motDePasse);
     if (d.chefId) await this.db.utilisateur.update({ where: { id: utilisateur.id }, data: { chefId: d.chefId } });
     await this.auditer(acteur, "compte.creer", utilisateur.email, { role: d.role, ...(d.chefId && { chefId: d.chefId }) });
     return { compte: { id: utilisateur.id, email: utilisateur.email, identifiant: affichage(utilisateur.email) }, motDePasse };

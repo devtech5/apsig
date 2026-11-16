@@ -46,7 +46,9 @@ describe("Accès terrain", () => {
         .set("Origin", config.centraleUrl)
         .send({ email: `225${tel}@terrain.apsig.ci`, password: cree.body.motDePasse })
         .expect(200);
-      expect((await recenseur.get("/compte").expect(200)).body).toMatchObject({ role: "RECENSEUR", espaces: ["recensement"], deuxFacteursRequis: false });
+      expect((await recenseur.get("/compte").expect(200)).body).toMatchObject({ role: "RECENSEUR", espaces: ["recensement"], deuxFacteursRequis: false, motDePasseProvisoire: true });
+      // Première connexion : le mot de passe provisoire remis par le chef est remplacé.
+      await recenseur.post("/compte/mot-de-passe").send({ actuel: cree.body.motDePasse, nouveau: "Kone-Awa-recense-26" }).expect(200);
 
       const r = await recenseur
         .post("/pose/recensements")
@@ -122,7 +124,8 @@ describe("Poseurs et zones", () => {
 
     const poseur = request.agent(app.getHttpServer());
     await poseur.post("/api/auth/sign-in/email").set("Origin", config.centraleUrl).send({ email: `225${tel}@terrain.apsig.ci`, password: cree.body.motDePasse }).expect(200);
-    expect((await poseur.get("/compte").expect(200)).body).toMatchObject({ role: "AGENT", espaces: ["pose"] });
+    expect((await poseur.get("/compte").expect(200)).body).toMatchObject({ role: "AGENT", espaces: ["pose"], motDePasseProvisoire: true });
+    await poseur.post("/compte/mot-de-passe").send({ actuel: cree.body.motDePasse, nouveau: "Diallo-pose-2026" }).expect(200);
     await poseur.post("/pose/recensements").send({}).expect(403);
     const liste = await poseur.get("/pose/a-poser").expect(200);
     expect(liste.body.zones).toEqual([zone]);

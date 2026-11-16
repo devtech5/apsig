@@ -9,6 +9,8 @@ export type Compte = {
   espaces: Espace[];
   deuxFacteurs: boolean;
   deuxFacteursRequis: boolean;
+  // Mot de passe donné par un responsable : à remplacer avant tout accès (page Sécurité).
+  motDePasseProvisoire: boolean;
 };
 
 export type Presence = "EN_SERVICE" | "PAUSE" | "HORS_SERVICE";

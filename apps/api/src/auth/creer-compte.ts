@@ -2,7 +2,8 @@
 //   node apps/api/dist/auth/creer-compte.js --email awa@apsig.ci --nom "Awa K." --role OPERATEUR
 //   node apps/api/dist/auth/creer-compte.js --email awa@apsig.ci   (nouveau mot de passe)
 // Le premier compte de production est un SUPERADMIN, qui crée ensuite les autres depuis le back-office.
-// Le mot de passe est généré et affiché une seule fois : il n'est stocké que haché.
+// Le mot de passe est généré et affiché une seule fois : il n'est stocké que haché. Il est provisoire :
+// la personne le remplace par le sien à sa première connexion.
 import { parseArgs } from "node:util";
 import { createPrismaClient, type RoleUtilisateur } from "@apsig/db";
 import { ROLES, type Role } from "@apsig/domain";
@@ -21,7 +22,7 @@ try {
     role: values.role as RoleUtilisateur | undefined,
   });
   console.log(`${cree ? "Compte créé" : "Mot de passe réinitialisé"} : ${utilisateur.email} (${utilisateur.role})`);
-  console.log(`Mot de passe (affiché une seule fois) : ${motDePasse}`);
+  console.log(`Mot de passe provisoire (affiché une seule fois, à remplacer à la première connexion) : ${motDePasse}`);
 } finally {
   await db.$disconnect();
 }

@@ -88,3 +88,7 @@ export const telephoneDeEmail = (email: string) => {
   const n = email.split("@")[0]!.slice(3);
   return n.replace(/(\d{2})(?=\d)/g, "$1 ");
 };
+
+// Mot de passe : celui que choisit l'utilisateur (12 caractères au moins, règle de Better Auth) et le mot de passe
+// provisoire donné par un responsable à la création ou à la réinitialisation (8 au moins), à remplacer à la première connexion.
+export const MOT_DE_PASSE = { min: 12, provisoireMin: 8, max: 128 } as const;

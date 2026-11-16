@@ -439,6 +439,8 @@ model Utilisateur {
   unite      Unite?          @relation(fields: [uniteId], references: [id])
   actif      Boolean         @default(true)
   deuxFacteurs Boolean       @default(false) // twoFactorEnabled de Better Auth
+  // Mot de passe donné par un responsable (création, réinitialisation) : à remplacer à la première connexion.
+  motDePasseProvisoire Boolean @default(false)
   presence   Presence        @default(HORS_SERVICE)
   presenceLe DateTime?
   jetonPush  String? // jeton Expo des notifications de l'application mobile (missions des unités)

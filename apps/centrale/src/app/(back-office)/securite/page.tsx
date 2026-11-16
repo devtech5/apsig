@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { useState } from "react";
+import { MOT_DE_PASSE } from "@apsig/domain";
 import { accueilDe } from "@/lib/navigation";
 import { useSession } from "@/components/Session";
 import { appelApi, ErreurApi } from "@/lib/api";
@@ -14,6 +15,15 @@ const message = (e: unknown, mauvais: string) =>
 
 export default function Securite() {
   const { compte, recharger } = useSession();
+  // Première connexion : le mot de passe provisoire se remplace avant tout le reste.
+  if (compte.motDePasseProvisoire) {
+    return (
+      <main className="mx-auto grid max-w-2xl gap-4 p-4">
+        <h1 className="text-xl font-black">Bienvenue, {compte.nom}</h1>
+        <ChoisirMotDePasse onChange={recharger} />
+      </main>
+    );
+  }
   return (
     <main className="mx-auto grid max-w-2xl gap-4 p-4">
       <h1 className="text-xl font-black">Sécurité du compte</h1>
@@ -30,6 +40,62 @@ export default function Securite() {
       )}
       <ChangerMotDePasse />
     </main>
+  );
+}
+
+// Mot de passe provisoire remis par un responsable : l'utilisateur choisit le sien. La double authentification
+// (si son rôle l'exige) s'active ensuite sur cette même page ; sinon il rejoint son espace.
+function ChoisirMotDePasse({ onChange }: { onChange: () => Promise<void> }) {
+  const router = useRouter();
+  const { compte } = useSession();
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [envoi, setEnvoi] = useState(false);
+
+  async function choisir(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const champs = new FormData(e.currentTarget);
+    const actuel = String(champs.get("actuel") ?? "");
+    const nouveau = String(champs.get("nouveau") ?? "");
+    if (nouveau !== champs.get("confirmation")) return setErreur("Les deux nouveaux mots de passe diffèrent");
+    if (nouveau === actuel) return setErreur("Choisissez un mot de passe différent du mot de passe provisoire");
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      await appelApi("/compte/mot-de-passe", { actuel, nouveau });
+      await onChange();
+      if (!compte.deuxFacteursRequis) router.replace(accueilDe(compte.espaces));
+    } catch (err) {
+      setErreur((err as Error).message);
+      setEnvoi(false);
+    }
+  }
+
+  return (
+    <section className="grid gap-3 rounded-2xl bg-white p-5 shadow-sm">
+      <h2 className="font-bold">Choisissez votre mot de passe</h2>
+      <p className="text-sm text-attenue">
+        Le mot de passe qui vous a été remis est provisoire. Remplacez-le par un mot de passe personnel, connu de vous seul, avant d'accéder à votre
+        espace.
+      </p>
+      <form onSubmit={choisir} className="grid gap-3 sm:max-w-sm">
+        <label className="grid gap-1 text-sm font-semibold">
+          Mot de passe provisoire
+          <input name="actuel" type="password" autoComplete="current-password" required className="rounded-lg border border-ligne px-3 py-2 font-normal" />
+        </label>
+        <label className="grid gap-1 text-sm font-semibold">
+          Nouveau mot de passe ({MOT_DE_PASSE.min} caractères minimum)
+          <input name="nouveau" type="password" autoComplete="new-password" minLength={MOT_DE_PASSE.min} maxLength={MOT_DE_PASSE.max} required className="rounded-lg border border-ligne px-3 py-2 font-normal" />
+        </label>
+        <label className="grid gap-1 text-sm font-semibold">
+          Confirmation
+          <input name="confirmation" type="password" autoComplete="new-password" minLength={MOT_DE_PASSE.min} maxLength={MOT_DE_PASSE.max} required className="rounded-lg border border-ligne px-3 py-2 font-normal" />
+        </label>
+        {erreur && <p role="alert" className="rounded-lg bg-danger-fond px-3 py-2 text-sm text-danger">{erreur}</p>}
+        <button disabled={envoi} className="rounded-lg bg-brand px-4 py-2.5 font-bold text-white disabled:opacity-60">
+          Enregistrer mon mot de passe
+        </button>
+      </form>
+    </section>
   );
 }
 
