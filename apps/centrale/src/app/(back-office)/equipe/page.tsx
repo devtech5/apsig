@@ -125,7 +125,7 @@ export default function PageEquipe() {
         <div role="status" className="grid gap-2 rounded-2xl border-2 border-brand bg-brand-clair p-4">
           <p className="text-sm">
             Mot de passe provisoire de <strong>{secret.pour}</strong>, affiché une seule fois. Remettez-le en main propre : la personne se connecte sur
-            code-secours.apsig.online (ou l'application mobile) avec son téléphone et ce mot de passe, puis le remplace par le sien à la première connexion.
+            op.apsig.online (ou l'application mobile) avec son téléphone et ce mot de passe, puis le remplace par le sien à la première connexion.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <code className="rounded-lg bg-white px-3 py-2 font-mono text-lg font-bold tracking-wider select-all">{secret.motDePasse}</code>
@@ -162,7 +162,7 @@ export default function PageEquipe() {
         </form>
         <p className="mt-2 text-xs text-attenue">
           Le recenseur inscrit les clients (étape 1) et ne voit que les siens. Le poseur pose les plaques (étape 2) chez les clients de ses communes : attribuez-lui
-          ses zones ci-dessous. Tous deux se connectent sur code-secours.apsig.online avec leur téléphone.
+          ses zones ci-dessous. Tous deux se connectent sur op.apsig.online avec leur téléphone.
           {admin && " Pour rattacher un membre à un chef d'équipe, utilisez la page Personnel du QG."}
         </p>
       </Bloc>

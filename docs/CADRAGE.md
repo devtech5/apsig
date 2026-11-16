@@ -101,7 +101,7 @@ Les inscriptions en ligne (`code-secours.apsig.online`, `apps/inscription`) dép
 
 **Trois sites** (décidés le 14/11/2026), une même application web :
 - `centrale.apsig.online` : le personnel qui reçoit et traite les alertes (centrale, carte, supervision) ;
-- `code-secours.apsig.online` : le terrain. Recenseurs et chefs d'équipe recensent ; les poseurs voient les clients à équiper de **leurs communes** (zones attribuées par le chef d'équipe ou le QG) et concluent l'inscription. Le formulaire public d'inscription est supprimé ;
+- `op.apsig.online` (décidé le 16/11/2026 ; `code-secours.apsig.online`, l'ancienne adresse, y mène aussi) : le terrain. Recenseurs et chefs d'équipe recensent ; les poseurs voient les clients à équiper de **leurs communes** (zones attribuées par le chef d'équipe ou le QG) et concluent l'inscription. Le formulaire public d'inscription est supprimé ;
 - `base.apsig.online` : le QG. Personnel (comptes, équipes, journal), abonnements, finance (encaissements, soldes, mensualités, commissions), forfaits (création, prix, retrait, migration des abonnés), prestataires et intervenants.
 
 Travail dissocié : le recenseur recense, le poseur pose. Recenseurs et poseurs se connectent au téléphone, sans double authentification.

@@ -2,14 +2,15 @@ import type { Espace } from "@apsig/domain";
 
 // Une seule application, trois sites selon le domaine :
 // - centrale.apsig.online : le personnel qui reçoit et traite les alertes ;
-// - code-secours.apsig.online : le terrain (recenseurs, chefs d'équipe, poseurs de plaques) ;
+// - op.apsig.online : le terrain (recenseurs, chefs d'équipe, poseurs de plaques) ; code-secours.apsig.online,
+//   son ancienne adresse, y mène aussi ;
 // - base.apsig.online : le QG, qui pilote tout (personnel, abonnements, finance, forfaits, prestataires).
 // En développement (localhost), toutes les pages sont ouvertes.
 export type Site = "centrale" | "terrain" | "base" | "tout";
 
 export function siteDe(hote: string): Site {
   if (hote.startsWith("centrale.")) return "centrale";
-  if (hote.startsWith("code-secours.")) return "terrain";
+  if (hote.startsWith("op.") || hote.startsWith("code-secours.")) return "terrain";
   if (hote.startsWith("base.")) return "base";
   return "tout";
 }
@@ -18,7 +19,7 @@ export const siteCourant = (): Site => (typeof window === "undefined" ? "tout" :
 
 export const NOMS_SITE: Record<Exclude<Site, "tout">, { titre: string; sousTitre: string; adresse: string }> = {
   centrale: { titre: "Centrale APSIG", sousTitre: "Réception et traitement des alertes", adresse: "https://centrale.apsig.online" },
-  terrain: { titre: "Espace terrain", sousTitre: "Recensement et pose des plaques", adresse: "https://code-secours.apsig.online" },
+  terrain: { titre: "Espace terrain", sousTitre: "Recensement et pose des plaques", adresse: "https://op.apsig.online" },
   base: { titre: "QG APSIG", sousTitre: "Pilotage du projet", adresse: "https://base.apsig.online" },
 };
 
