@@ -25,6 +25,10 @@
   --color-alerte-encre: #854d0e;
   --color-danger: #b91c1c;
   --color-danger-fond: #fee2e2;
+
+  /* Graphique du tableau de bord du QG : deux séries validées (lisibles aussi par les daltoniens). */
+  --color-serie-abonnement: #2a5fb0;
+  --color-serie-acompte: #eb6834;
 }
 
 body {

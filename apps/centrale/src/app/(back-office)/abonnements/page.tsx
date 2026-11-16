@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { LIBELLES_ETAT_ABONNEMENT } from "@apsig/domain";
 import { CHAMP, Erreur } from "@/components/Formulaire";
 import { Icone } from "@/components/Icone";
@@ -9,8 +10,19 @@ import { COULEUR_ETAT, date, type FoyerResume } from "@/lib/abonnements";
 import { appelApi } from "@/lib/api";
 
 // Foyers abonnés : recherche par nom, téléphone, code imprimé, code court ou numéro de foyer.
+// La recherche peut venir de l'en-tête du QG (/abonnements?q=…).
 export default function PageAbonnements() {
-  const [q, setQ] = useState("");
+  return (
+    <Suspense>
+      <ListeAbonnements />
+    </Suspense>
+  );
+}
+
+function ListeAbonnements() {
+  const demande = useSearchParams().get("q") ?? "";
+  const [q, setQ] = useState(demande);
+  useEffect(() => setQ(demande), [demande]);
   const [foyers, setFoyers] = useState<FoyerResume[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 

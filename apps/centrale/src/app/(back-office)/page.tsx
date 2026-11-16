@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { accueilDe } from "@/components/Coque";
+import { accueilDe } from "@/lib/navigation";
 import { useSession } from "@/components/Session";
 import { TableauDeBord } from "@/components/TableauDeBord";
 

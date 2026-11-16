@@ -3,7 +3,8 @@ import type { TypeUrgence } from "@apsig/domain";
 export type NomIcone =
   | "bouclier" | "croix" | "flamme" | "recherche" | "stethoscope" | "question"
   | "repere" | "telephone" | "alerte" | "son" | "sourdine" | "sortie"
-  | "file" | "carte" | "equipe" | "maison" | "reglages" | "cadenas" | "lien" | "imprimante" | "plus";
+  | "file" | "carte" | "equipe" | "maison" | "reglages" | "cadenas" | "lien" | "imprimante" | "plus"
+  | "tableau" | "portefeuille" | "loupe" | "menu" | "fermer" | "horloge" | "calendrier";
 
 // Tracés au style Lucide (trait 2 px), repris de apps/alerte.
 const TRACES: Record<NomIcone, React.ReactNode> = {
@@ -138,6 +139,53 @@ const TRACES: Record<NomIcone, React.ReactNode> = {
     <>
       <path d="M5 12h14" />
       <path d="M12 5v14" />
+    </>
+  ),
+  tableau: (
+    <>
+      <rect width="7" height="9" x="3" y="3" rx="1" />
+      <rect width="7" height="5" x="14" y="3" rx="1" />
+      <rect width="7" height="9" x="14" y="12" rx="1" />
+      <rect width="7" height="5" x="3" y="16" rx="1" />
+    </>
+  ),
+  portefeuille: (
+    <>
+      <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+      <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+    </>
+  ),
+  loupe: (
+    <>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </>
+  ),
+  menu: (
+    <>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </>
+  ),
+  fermer: (
+    <>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </>
+  ),
+  horloge: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </>
+  ),
+  calendrier: (
+    <>
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
     </>
   ),
 };

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { useState } from "react";
-import { accueilDe } from "@/components/Coque";
+import { accueilDe } from "@/lib/navigation";
 import { useSession } from "@/components/Session";
 import { appelApi, ErreurApi } from "@/lib/api";
 

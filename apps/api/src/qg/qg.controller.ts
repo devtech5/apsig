@@ -7,6 +7,7 @@ import { AdministrationService } from "../administration/administration.service.
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
 import { ZodPipe } from "../common/zod.pipe.ts";
 import { PrismaService } from "../prisma/prisma.service.ts";
+import { TableauDeBordService } from "./tableau-de-bord.ts";
 
 // QG (base.apsig.online) : pilotage du projet. Finance, forfaits et abonnements, prestataires et intervenants.
 
@@ -122,11 +123,20 @@ export class FinanceService {
 @UseGuards(BackOfficeGuard)
 @EspaceRequis("finance")
 export class FinanceController {
-  constructor(private readonly service: FinanceService) {}
+  constructor(
+    private readonly service: FinanceService,
+    private readonly tableauDeBord: TableauDeBordService,
+  ) {}
 
   @Get()
   tableau() {
     return this.service.tableau();
+  }
+
+  // Page d'accueil du QG.
+  @Get("tableau-de-bord")
+  tableauDeBordQg() {
+    return this.tableauDeBord.tableau();
   }
 }
 
@@ -327,6 +337,6 @@ export class PrestatairesController {
 @Module({
   imports: [AdministrationModule],
   controllers: [FinanceController, ForfaitsController, PrestatairesController],
-  providers: [FinanceService, ForfaitsService, PrestatairesService],
+  providers: [FinanceService, TableauDeBordService, ForfaitsService, PrestatairesService],
 })
 export class QgModule {}
