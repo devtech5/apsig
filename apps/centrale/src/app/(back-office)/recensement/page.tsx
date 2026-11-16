@@ -1,49 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import QRCode from "qrcode";
-import { useCallback, useEffect, useState } from "react";
-import {
-  CIBLES,
-  cleLieu,
-  FORFAIT_UNIQUE,
-  LIBELLES_CIBLE_DETAILLES,
-  LIBELLES_MOYEN_PAIEMENT,
-  MENSUALITES_FCFA,
-  MOYENS_PAIEMENT,
-  type Cible,
-  type MoyenPaiement,
-} from "@apsig/domain";
+import { useEffect, useState } from "react";
+import { CIBLES, cleLieu, FORFAIT_UNIQUE, LIBELLES_CIBLE_DETAILLES, LIBELLES_MOYEN_PAIEMENT, MENSUALITES_FCFA, MOYENS_PAIEMENT, type Cible, type MoyenPaiement } from "@apsig/domain";
+import { ClientsRecenses, etatPaiement, fcfa, PRIX, QrGeneres, type Recense } from "@/components/ClientsRecenses";
 import { BOUTON, CHAMP, Champ, Erreur } from "@/components/Formulaire";
 import { Icone } from "@/components/Icone";
 import { ListeSaisie } from "@/components/ListeSaisie";
+import { useSession } from "@/components/Session";
 import { appelApi } from "@/lib/api";
-import { dateHeure } from "@/lib/format";
 
 // Listes de l'API : toutes les villes de Côte d'Ivoire, leurs communes et leurs quartiers connus (par nom).
 type Ville = { nom: string; communes: string[]; quartiers: { nom: string; commune: string | null }[] };
-type Recense = {
-  id: string;
-  code: string | null;
-  qr: { plaque: string | null; interieur: { code: string; url: string } | null };
-  rccm: string | null;
-  client: string;
-  telephone: string | null;
-  telephone2: string | null;
-  lieu: string;
-  cible: Cible | null;
-  paye: boolean;
-  encaisseFcfa: number;
-  resteFcfa: number;
-  posee: boolean;
-  creeLe: string;
-};
 
 const cle = (s: string) => cleLieu(s);
-const etatPaiement = (r: { paye: boolean; encaisseFcfa: number; resteFcfa: number }) =>
-  r.paye ? "Payé" : r.encaisseFcfa > 0 ? `Acompte ${fcfa(r.encaisseFcfa)} · reste ${fcfa(r.resteFcfa)}` : "Non payé";
-const fcfa = (n: number) => `${n.toLocaleString("fr-FR").replace(/ /g, " ")} F`;
-const PRIX = fcfa(FORFAIT_UNIQUE.abonnementFcfa);
 // Espèces en premier : c'est le cas le plus courant sur le terrain.
 const MOYENS = ["ESPECES", ...MOYENS_PAIEMENT.filter((m) => m !== "ESPECES")] as MoyenPaiement[];
 
@@ -69,20 +39,19 @@ function Puces<T extends string>({ nom, options, valeur, onChange }: { nom: stri
 // Inscription en deux temps, étape 1 : l'agent recense le client ; le code Code-Secours (code de la plaque) est créé
 // aussitôt. Étape 2 : la plaque est posée et scannée, le GPS devient l'adresse vérifiée.
 export default function PageRecensement() {
+  const { compte } = useSession();
   const [villes, setVilles] = useState<Ville[] | null>(null);
-  const [liste, setListe] = useState<Recense[] | null>(null);
+  const [version, setVersion] = useState(0);
   const [erreur, setErreur] = useState<string | null>(null);
   const [formulaire, setFormulaire] = useState(false);
   const [fait, setFait] = useState<Recense | null>(null);
-
-  const charger = useCallback(() => {
-    appelApi<Recense[]>("/pose/recensements").then(setListe, (e: Error) => setErreur(e.message));
-  }, []);
+  // Chef d'équipe et QG : la liste couvre plusieurs recenseurs, on affiche qui a recensé.
+  const equipe = compte.role !== "RECENSEUR";
+  const charger = () => setVersion((v) => v + 1);
 
   useEffect(() => {
-    charger();
     appelApi<Ville[]>("/pose/referentiel").then(setVilles, (e: Error) => setErreur(e.message));
-  }, [charger]);
+  }, []);
 
   if (fait) {
     return (
@@ -102,7 +71,7 @@ export default function PageRecensement() {
           Recenser un autre client
         </button>
         <button type="button" className="rounded-lg px-3 py-2 text-sm font-semibold text-attenue hover:bg-white" onClick={() => setFait(null)}>
-          Voir mes clients recensés
+          Voir les clients recensés
         </button>
       </div>
     );
@@ -135,7 +104,7 @@ export default function PageRecensement() {
           <p className="text-attenue">Chargement…</p>
         )
       ) : (
-        <section className="grid gap-2">
+        <>
           <p className="text-sm text-attenue">
             Offre de lancement : {PRIX}, premier mois compris. Le code Code-Secours et les QR sont générés à la validation ; la plaque est posée au second passage (
             <Link href="/pose" className="font-semibold text-brand underline">
@@ -143,28 +112,8 @@ export default function PageRecensement() {
             </Link>
             ).
           </p>
-          {!liste && !erreur && <p className="text-attenue">Chargement…</p>}
-          {liste?.length === 0 && <p className="rounded-xl bg-white p-6 text-center text-attenue">Aucun client recensé pour l'instant.</p>}
-          <ul className="grid gap-2">
-            {liste?.map((r) => (
-              <li key={r.id} className="grid gap-1 rounded-xl bg-white px-4 py-3 shadow-sm">
-                <p className="font-mono text-lg font-black tracking-wide text-brand">{r.code ?? "Code en attente"}</p>
-                <p className="font-bold">{r.client}</p>
-                <p className="text-sm text-attenue">
-                  {r.lieu}
-                  {r.telephone && ` · ${r.telephone}`}
-                  {r.telephone2 && ` / ${r.telephone2}`}
-                  {r.rccm && ` · RCCM ${r.rccm}`} · {dateHeure(r.creeLe)}
-                </p>
-                <p className="flex flex-wrap gap-2 text-xs font-bold">
-                  <span className={`rounded px-2 py-0.5 ${r.paye ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>{etatPaiement(r)}</span>
-                  <span className={`rounded px-2 py-0.5 ${r.posee ? "bg-succes-fond text-succes" : "bg-alerte-fond text-alerte-encre"}`}>{r.posee ? "Plaque posée" : "Plaque à poser"}</span>
-                  {r.cible && <span className="rounded bg-fond px-2 py-0.5 text-encre">{LIBELLES_CIBLE_DETAILLES[r.cible]}</span>}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
+          <ClientsRecenses titre={equipe ? "Clients recensés par l'équipe" : "Mes clients recensés"} version={version} montrerRecenseur={equipe} />
+        </>
       )}
     </div>
   );
@@ -327,31 +276,5 @@ function Fiche({ villes, onAnnuler, onFait }: { villes: Ville[]; onAnnuler: () =
         </button>
       </div>
     </form>
-  );
-}
-
-// QR générés dès la validation : plaque du portail et QR intérieur, à imprimer avant la pose.
-function QrGeneres({ recense }: { recense: Recense }) {
-  const [images, setImages] = useState<{ code: string; libelle: string; src: string }[]>([]);
-  useEffect(() => {
-    const liste = [
-      recense.qr.plaque && recense.code ? { code: recense.code, libelle: "Plaque du portail", url: recense.qr.plaque } : null,
-      recense.qr.interieur ? { code: recense.qr.interieur.code, libelle: "QR intérieur", url: recense.qr.interieur.url } : null,
-    ].filter((x) => x !== null);
-    void Promise.all(liste.map(async (q) => ({ code: q.code, libelle: q.libelle, src: await QRCode.toDataURL(q.url, { errorCorrectionLevel: "H", margin: 1, width: 400 }) }))).then(setImages);
-  }, [recense]);
-  if (images.length === 0) return null;
-  return (
-    <section className="grid grid-cols-2 gap-3">
-      {images.map((q) => (
-        <figure key={q.code} className="grid justify-items-center gap-1 rounded-2xl bg-white p-3 text-center shadow-sm">
-          <img src={q.src} alt={`QR ${q.libelle} ${q.code}`} className="aspect-square w-full max-w-48" />
-          <figcaption className="text-xs">
-            <span className="block font-bold">{q.libelle}</span>
-            <span className="font-mono">{q.code}</span>
-          </figcaption>
-        </figure>
-      ))}
-    </section>
   );
 }

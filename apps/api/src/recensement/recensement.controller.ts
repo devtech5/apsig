@@ -1,6 +1,7 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, Injectable, Module, Post, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, ConflictException, Controller, Get, Injectable, Module, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { CIBLES, cleLieu, COMMUNES_CI, FORFAIT_UNIQUE, MOYENS_PAIEMENT, urlAlerte, VILLES_CI, type Cible } from "@apsig/domain";
+import type { Prisma } from "@apsig/db";
+import { CIBLES, cleLieu, COMMUNES_CI, FORFAIT_UNIQUE, MOYENS_PAIEMENT, urlAlerte, VILLES_CI, type Cible, type Role } from "@apsig/domain";
 import { AbonnementsModule } from "../abonnements/abonnements.module.ts";
 import { AbonnementsService } from "../abonnements/abonnements.service.ts";
 import { BackOfficeGuard, EspaceRequis, Utilisateur, type UtilisateurConnecte } from "../auth/auth.module.ts";
@@ -140,23 +141,30 @@ export class RecensementService {
     return this.resume(foyer.id);
   }
 
-  // Derniers clients recensés par l'agent, avec leur état : payé, plaque posée.
-  async mesRecensements(u: UtilisateurConnecte) {
-    const foyers = await this.db.foyer.findMany({ where: { recenseParId: u.id }, orderBy: { creeLe: "desc" }, take: 50, select: { id: true } });
-    return Promise.all(foyers.map((f) => this.resume(f.id)));
+  // Clients recensés, du plus récent au plus ancien, avec leur code de plaque, leurs QR et leur état (payé, plaque posée).
+  // Le recenseur voit ses clients, le chef d'équipe ceux de son équipe, le QG (administration, conseillers) tous.
+  // Recherche facultative : nom, code de plaque ou téléphone.
+  async recensements(u: UtilisateurConnecte, q?: string) {
+    const foyers = await this.db.foyer.findMany({
+      where: { AND: [this.portee(u), ...(q ? [rechercheClient(q)] : [])] },
+      orderBy: { creeLe: "desc" },
+      take: LISTE_MAX,
+      include: INCLUS_RESUME,
+    });
+    return foyers.map((f) => this.presenter(f));
+  }
+
+  private portee(u: UtilisateurConnecte): Prisma.FoyerWhereInput {
+    if (TOUS_LES_CLIENTS.includes(u.role)) return { recenseParId: { not: null } };
+    if (u.role === "CHEF_EQUIPE") return { OR: [{ recenseParId: u.id }, { recensePar: { is: { chefId: u.id } } }] };
+    return { recenseParId: u.id };
   }
 
   private async resume(id: string) {
-    const f = await this.db.foyer.findUniqueOrThrow({
-      where: { id },
-      include: {
-        quartier: { include: { ville: true, commune: true } },
-        membres: { where: { role: "TITULAIRE" }, take: 1 },
-        supports: { where: { type: { in: ["PORTAIL", "INTERIEUR"] } }, include: { pose: true }, orderBy: { creeLe: "asc" } },
-        paiements: { where: { statut: "REUSSI" }, select: { montantFcfa: true } },
-        abonnements: { orderBy: { fin: "desc" }, take: 1, include: { formule: true } },
-      },
-    });
+    return this.presenter(await this.db.foyer.findUniqueOrThrow({ where: { id }, include: INCLUS_RESUME }));
+  }
+
+  private presenter(f: Prisma.FoyerGetPayload<{ include: typeof INCLUS_RESUME }>) {
     const t = f.membres[0];
     const plaque = f.supports.find((s) => s.type === "PORTAIL");
     const interieur = f.supports.find((s) => s.type === "INTERIEUR");
@@ -182,10 +190,38 @@ export class RecensementService {
       encaisseFcfa,
       resteFcfa: solde ? 0 : Math.max(0, FORFAIT_UNIQUE.abonnementFcfa - encaisseFcfa),
       posee: Boolean(plaque?.pose),
+      recenseur: f.recensePar?.nom ?? null,
       creeLe: f.creeLe,
     };
   }
 }
+
+const LISTE_MAX = 100;
+const TOUS_LES_CLIENTS: readonly Role[] = ["CONSEILLER", "ADMIN", "SUPERADMIN"];
+
+const INCLUS_RESUME = {
+  quartier: { include: { ville: true, commune: true } },
+  membres: { where: { role: "TITULAIRE" }, take: 1 },
+  supports: { where: { type: { in: ["PORTAIL", "INTERIEUR"] } }, include: { pose: true }, orderBy: { creeLe: "asc" } },
+  paiements: { where: { statut: "REUSSI" }, select: { montantFcfa: true } },
+  abonnements: { orderBy: { fin: "desc" }, take: 1, include: { formule: true } },
+  recensePar: { select: { nom: true } },
+} satisfies Prisma.FoyerInclude;
+
+// Un mot de la recherche : nom du client, code de plaque (« abj-yop-niangon-453 »), ou téléphone (au moins 4 chiffres).
+function rechercheClient(q: string): Prisma.FoyerWhereInput {
+  const texte = q.trim().slice(0, 80);
+  const chiffres = texte.replace(/\D/g, "");
+  return {
+    OR: [
+      { libelle: { contains: texte, mode: "insensitive" } },
+      { supports: { some: { code: { contains: texte.toUpperCase().replace(/\s+/g, "") } } } },
+      ...(chiffres.length >= 4 ? [{ membres: { some: { telephone: { contains: chiffres.slice(-8) } } } }] : []),
+    ],
+  };
+}
+
+const recherche = z.object({ q: z.string().trim().max(80).optional().transform((v) => (v ? v : undefined)) });
 
 // Routes sous /pose (l'application mobile les appelle déjà) mais ouvertes à l'espace Recensement : le recenseur y a accès,
 // pas à la pose des plaques.
@@ -201,8 +237,8 @@ export class RecensementController {
   }
 
   @Get("recensements")
-  mesRecensements(@Utilisateur() u: UtilisateurConnecte) {
-    return this.service.mesRecensements(u);
+  recensements(@Query(new ZodPipe(recherche)) { q }: z.infer<typeof recherche>, @Utilisateur() u: UtilisateurConnecte) {
+    return this.service.recensements(u, q);
   }
 
   @Post("recensements")

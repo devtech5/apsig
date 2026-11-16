@@ -16,6 +16,7 @@ export const NAVIGATION: LienNavigation[] = [
   { href: "/tableau-de-bord", libelle: "Tableau de bord", icone: "tableau", espace: "finance", groupe: "Pilotage" },
   { href: "/finance", libelle: "Finance", icone: "portefeuille", espace: "finance", groupe: "Pilotage" },
   { href: "/abonnements", libelle: "Abonnements", icone: "maison", espace: "abonnements", groupe: "Clients" },
+  { href: "/clients", libelle: "Clients recensés", icone: "equipe", espace: "abonnements", groupe: "Clients" },
   { href: "/forfaits", libelle: "Forfaits", icone: "lien", espace: "forfaits", groupe: "Offre" },
   { href: "/prestataires", libelle: "Prestataires", icone: "bouclier", espace: "prestataires", groupe: "Offre" },
   { href: "/administration", libelle: "Personnel", icone: "reglages", espace: "administration", groupe: "Administration" },
